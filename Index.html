@@ -1,0 +1,1749 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>ALLSTON PAVILION // Matte Architectural Portfolio Gallery</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Antonio:wght@400;700&family=JetBrains+Mono:wght@400;600;700&display=swap');
+
+    :root {
+      --bg-primary: #050507;
+      --bg-panel: rgba(10, 11, 14, 0.88);
+      --text-main: #d8b892;
+      --text-muted: #828c99;
+      --accent-1: #cc7a29;
+      --accent-2: #4a6fa5;
+      --border-col: rgba(204, 122, 41, 0.65);
+      --radius-panel: 24px;
+      --radius-btn: 9999px;
+      --font-head: 'Antonio', sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+    }
+
+    body[data-style="eink"] {
+      --bg-primary: #eae8e1;
+      --bg-panel: rgba(244, 242, 236, 0.94);
+      --text-main: #111111;
+      --text-muted: #555555;
+      --accent-1: #111111;
+      --accent-2: #333333;
+      --border-col: #111111;
+      --radius-panel: 0px;
+      --radius-btn: 0px;
+      --font-head: 'JetBrains Mono', monospace;
+      --font-mono: 'JetBrains Mono', monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      user-select: none;
+    }
+
+    body, html {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: var(--bg-primary);
+      color: var(--text-main);
+      font-family: var(--font-mono);
+    }
+
+    #canvas-container {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      touch-action: none;
+      z-index: 1;
+    }
+
+    .hud-panel {
+      background: var(--bg-panel);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border: 1px solid var(--border-col);
+      border-radius: var(--radius-panel);
+      transition: background 0.25s ease, color 0.25s ease, border-color 0.25s ease;
+    }
+
+    body[data-style="lcars"] .lcars-sweep {
+      border-top-left-radius: 38px;
+      border-left: 12px solid var(--accent-1);
+    }
+
+    body[data-style="eink"] .hud-panel,
+    body[data-style="eink"] .hud-btn,
+    body[data-style="eink"] .hotspot-pin {
+      border-radius: 0px !important;
+      box-shadow: 2px 2px 0px #111111;
+    }
+
+    .hud-btn {
+      border-radius: var(--radius-btn);
+      border: 1px solid var(--border-col);
+      padding: 0.32rem 0.7rem;
+      font-size: 0.7rem;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      background: transparent;
+      color: var(--text-main);
+    }
+
+    .hud-btn:hover, .hud-btn.active {
+      background: var(--accent-1);
+      color: #08080a;
+    }
+
+    body[data-style="eink"] .hud-btn:hover,
+    body[data-style="eink"] .hud-btn.active {
+      background: #111111;
+      color: #f4f2ec;
+    }
+
+    input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 5px;
+      background: rgba(128, 128, 128, 0.3);
+      outline: none;
+      border-radius: 3px;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 14px;
+      height: 14px;
+      background: var(--accent-1);
+      border: 1.5px solid #e5e5e0;
+      cursor: pointer;
+      border-radius: var(--radius-btn);
+    }
+
+    #hotspot-layer {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 10;
+    }
+
+    .hotspot-pin {
+      position: absolute;
+      transform: translate(-50%, -50%);
+      pointer-events: auto;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 3px 9px;
+      font-size: 10.5px;
+      font-weight: 600;
+      background: rgba(8, 9, 12, 0.85);
+      color: var(--text-main);
+      border: 1px solid var(--border-col);
+      border-radius: 999px;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: transform 0.15s ease, background 0.15s ease;
+    }
+
+    .hotspot-pin:hover {
+      transform: translate(-50%, -50%) scale(1.06);
+      background: var(--accent-1);
+      color: #050505;
+    }
+
+    .zen-hidden {
+      opacity: 0 !important;
+      pointer-events: none !important;
+    }
+
+    ::-webkit-scrollbar {
+      width: 4px;
+      height: 4px;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: var(--border-col);
+    }
+  </style>
+</head>
+<body data-style="lcars">
+
+  <!-- 3D Viewport Container -->
+  <div id="canvas-container"></div>
+
+  <!-- 3D Projected Hotspots Layer -->
+  <div id="hotspot-layer"></div>
+
+  <!-- TOP NAVIGATION & TELEMETRY HEADER -->
+  <header id="hud-header" class="fixed top-3 left-3 right-3 z-20 flex flex-wrap items-center justify-between gap-2 px-4 py-2 hud-panel lcars-sweep transition-opacity duration-300">
+    <div class="flex items-center gap-3">
+      <div class="w-2.5 h-6 hidden sm:block" style="background: var(--accent-1);"></div>
+      <div>
+        <div class="flex items-center gap-2">
+          <h1 class="text-base sm:text-lg font-bold tracking-wider uppercase" style="font-family: var(--font-head);">
+            ALLSTON GALLERY PAVILION // MATTE ARCHITECTURAL ARCHIVE
+          </h1>
+          <span id="telemetry-stamp" class="text-[10px] px-2 py-0.5 border border-current opacity-75 hidden md:inline-block">
+            SD 2026.291 // LOW-KEY PBR
+          </span>
+        </div>
+        <p class="text-[10.5px] opacity-70">
+          ACES Filmic Tone Mapping • Directional Track Spotlights • WASD / Arrows or Click Tour Stops
+        </p>
+      </div>
+    </div>
+
+    <div class="flex flex-wrap items-center gap-1.5">
+      <button id="btn-ambient" class="hud-btn" title="Toggle Warm Analog Gallery Drone (M)">
+        🎵 AMBIENT: OFF [M]
+      </button>
+      <button id="btn-audio" class="hud-btn active" title="Toggle UI Audio Synth (S)">
+        🔊 SFX: ON [S]
+      </button>
+      <button id="btn-theme" class="hud-btn" title="Switch LCARS / German DIN 1451 E-Ink (T)">
+        🌓 UI: LCARS [T]
+      </button>
+      <button id="btn-units" class="hud-btn" title="Cycle Measurement Units">
+        📐 UNITS: METRIC [m]
+      </button>
+      <button id="btn-zen" class="hud-btn" title="Toggle Unobstructed Zen Walkthrough (Z)">
+        👁️ ZEN [Z]
+      </button>
+      <button id="btn-download-html" class="hud-btn" title="Download Standalone HTML Portfolio">
+        💾 SAVE HTML
+      </button>
+    </div>
+  </header>
+
+  <!-- FLOATING ZEN RESTORE BUTTON -->
+  <button id="btn-exit-zen" class="fixed top-4 right-4 z-30 hud-btn hidden">
+    👁️ EXIT ZEN [Z]
+  </button>
+
+  <!-- LEFT PANEL: ARCHITECTURAL & LIGHTING CONTROLS -->
+  <aside id="hud-left" class="fixed top-20 left-3 bottom-20 z-20 w-72 max-w-[85vw] hud-panel p-3.5 flex flex-col justify-between overflow-y-auto transition-opacity duration-300">
+    <div class="space-y-3.5">
+      <!-- Section 1: Exposure, Lighting & CAD -->
+      <div>
+        <div class="flex items-center justify-between border-b border-current/25 pb-1 mb-2">
+          <span class="text-xs font-bold uppercase tracking-wider">01 // Lighting &amp; Exposure</span>
+          <span id="time-readout" class="text-[11px] font-bold">21:00 NIGHT</span>
+        </div>
+
+        <div class="flex items-center justify-between mb-1">
+          <label class="text-[11px] opacity-80">Camera Exposure (ACES)</label>
+          <span id="exposure-readout" class="text-[11px] font-bold">0.65 EV</span>
+        </div>
+        <input id="slider-exposure" type="range" min="0.25" max="1.25" step="0.02" value="0.65" />
+
+        <label class="block text-[11px] mt-2.5 mb-1 opacity-80">Solar &amp; Reception Hour (06:00 - 22:00)</label>
+        <input id="slider-sun" type="range" min="6" max="22" step="0.25" value="21.0" />
+
+        <div class="flex items-center justify-between mt-2.5 mb-1">
+          <label class="text-[11px] opacity-80">Exploded Axonometric</label>
+          <span class="text-[11px] font-bold explode-readout">0% (ASSEMBLED)</span>
+        </div>
+        <input id="slider-explode" type="range" min="0" max="1" step="0.01" value="0" />
+
+        <div class="flex items-center justify-between mt-2.5 mb-1">
+          <label class="text-[11px] opacity-80">Storefront Entry Door</label>
+          <span id="door-readout" class="text-[11px] font-bold">CLOSED</span>
+        </div>
+        <input id="slider-door" type="range" min="0" max="1" step="0.02" value="0" />
+      </div>
+
+      <!-- Section 2: Cutaways & Matte Finishes -->
+      <div>
+        <div class="border-b border-current/25 pb-1 mb-2">
+          <span class="text-xs font-bold uppercase tracking-wider">02 // Cutaways &amp; Matte Finishes</span>
+        </div>
+        <div class="grid grid-cols-3 gap-1 mb-2">
+          <button class="hud-btn active text-[10px] py-1" data-cut="full">FULL</button>
+          <button class="hud-btn text-[10px] py-1" data-cut="no-roof">NO CEILING</button>
+          <button class="hud-btn text-[10px] py-1" data-cut="plan">1F PLAN</button>
+        </div>
+
+        <label class="block text-[11px] mb-1 opacity-80">Gallery Floor Finish (Matte PBR)</label>
+        <div class="grid grid-cols-3 gap-1 mb-2">
+          <button class="hud-btn active text-[10px] py-1" data-floor="maple">MUTED MAPLE</button>
+          <button class="hud-btn text-[10px] py-1" data-floor="concrete">RAW CONCRETE</button>
+          <button class="hud-btn text-[10px] py-1" data-floor="slate">CHARCOAL SLATE</button>
+        </div>
+
+        <div class="flex items-center justify-between gap-1 mt-2">
+          <button id="btn-toggle-pins" class="hud-btn active w-1/2 text-[10px]">📍 PINS: ON</button>
+          <button id="btn-eye-level" class="hud-btn w-1/2 text-[10px]">🚶 EYE LEVEL</button>
+        </div>
+      </div>
+
+      <!-- Section 3: Gallery Telemetry -->
+      <div>
+        <div class="border-b border-current/25 pb-1 mb-1.5 flex justify-between items-center">
+          <span class="text-xs font-bold uppercase tracking-wider">03 // Spatial Telemetry</span>
+          <span id="dim-readout" class="text-[10px] opacity-75">14.0m × 10.0m</span>
+        </div>
+        <div class="text-[11px] space-y-1 opacity-85">
+          <div class="flex justify-between">
+            <span>Net Exhibition Area:</span>
+            <span id="area-readout" class="font-bold">140.0 m²</span>
+          </div>
+          <div class="flex justify-between">
+            <span>Lighting Rig:</span>
+            <span class="font-bold">8 Aimed Spotlights (2700K)</span>
+          </div>
+          <div class="flex justify-between">
+            <span>Est. Fit-Out Turnkey:</span>
+            <span id="budget-readout" class="font-bold">$148,500 / ¥22.2M</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Section 4: Curator Scratchpad -->
+      <div>
+        <div class="border-b border-current/25 pb-1 mb-1.5 flex justify-between items-center">
+          <span class="text-xs font-bold uppercase tracking-wider">04 // Curator Notes</span>
+          <button id="btn-export-txt" class="text-[10px] underline cursor-pointer">EXPORT .TXT</button>
+        </div>
+        <textarea id="curator-notes" rows="2" placeholder="Record lighting cues or portfolio placement notes..." class="w-full p-2 text-xs bg-black/40 border border-current/35 text-current focus:outline-none"></textarea>
+      </div>
+    </div>
+
+    <div class="pt-2 border-t border-current/20 text-[10px] opacity-65 flex justify-between">
+      <span>ACES Filmic • Matte PBR</span>
+      <span>0 External Assets</span>
+    </div>
+  </aside>
+
+  <!-- RIGHT PANEL: SELECTED PORTFOLIO WORK INSPECTOR -->
+  <aside id="hud-right" class="fixed top-20 right-3 z-20 w-80 max-w-[88vw] hud-panel p-4 transition-opacity duration-300">
+    <div class="flex items-center justify-between border-b border-current/25 pb-1.5 mb-2">
+      <span id="work-badge" class="text-[10px] font-bold px-2 py-0.5 text-black uppercase" style="background: var(--accent-1);">
+        STOP 01 // EXTERIOR ARCHITECTURE
+      </span>
+      <span id="work-medium" class="text-[11px] opacity-75">3D Storefront</span>
+    </div>
+
+    <h2 id="work-title" class="text-lg font-bold tracking-wide uppercase mb-1" style="font-family: var(--font-head);">
+      Allston Night Storefront &amp; Ceramic Window
+    </h2>
+    <p id="work-subtitle" class="text-xs opacity-75 mb-2.5">
+      7-Bay Anodized Mullion Glazing • Sidewalk Trees • Low-Key Spotlights
+    </p>
+
+    <p id="work-desc" class="text-xs leading-relaxed opacity-85 mb-3">
+      Viewed from across the dark asphalt street at night, focused 2700K gallery track spotlights graze the rear ceramic plates and window pedestals without washing out the architectural shadows.
+    </p>
+
+    <div class="p-2.5 border border-current/25 bg-black/25 text-[11px] space-y-1 mb-3">
+      <div class="flex justify-between">
+        <span class="opacity-70">Location / Zone:</span>
+        <span id="work-zone" class="font-semibold">South Street Frontage (+Z)</span>
+      </div>
+      <div class="flex justify-between">
+        <span class="opacity-70">Dimensions:</span>
+        <span id="work-dims" class="font-semibold">14.0m W × 3.8m H</span>
+      </div>
+    </div>
+
+    <div class="flex items-center justify-between gap-2">
+      <button id="btn-prev-stop" class="hud-btn flex-1">◀ PREV</button>
+      <button id="btn-auto-tour" class="hud-btn flex-1">▶ AUTO TOUR</button>
+      <button id="btn-next-stop" class="hud-btn flex-1">NEXT ▶</button>
+    </div>
+  </aside>
+
+  <!-- BOTTOM BAR: GUIDED GALLERY TOUR STATIONS -->
+  <nav id="hud-bottom" class="fixed bottom-3 left-3 right-3 z-20 hud-panel px-3 py-2 flex items-center justify-between gap-2 overflow-x-auto transition-opacity duration-300">
+    <div class="flex items-center gap-1.5 mx-auto">
+      <button class="hud-btn active tour-stop-btn" data-stop="0">01. NIGHT STOREFRONT</button>
+      <button class="hud-btn tour-stop-btn" data-stop="1">02. MAIN GALLERY HALL</button>
+      <button class="hud-btn tour-stop-btn" data-stop="2">03. MONOCHROME ARCH PHOTOS</button>
+      <button class="hud-btn tour-stop-btn" data-stop="3">04. SCULPTURE &amp; BONSAI PLINTHS</button>
+      <button class="hud-btn tour-stop-btn" data-stop="4">05. STONEWARE VESSEL SHELF</button>
+      <button class="hud-btn tour-stop-btn" data-stop="5">06. CERAMIC PLATE ALCOVE</button>
+      <button class="hud-btn tour-stop-btn" data-stop="6">07. CRIMSON RELIEF &amp; EAST WALL</button>
+    </div>
+  </nav>
+
+  <script>
+    /*************************************************************************
+     * 1. PROCEDURAL WEB AUDIO SYNTHESIZER (WARM LOW-PASS GALLERY DRONE + UI)
+     *************************************************************************/
+    class GalleryAudioEngine {
+      constructor() {
+        this.ctx = null;
+        this.sfxEnabled = true;
+        this.ambientEnabled = false;
+        this.ambientNodes = [];
+      }
+
+      init() {
+        if (!this.ctx) {
+          const AudioCtx = window.AudioContext || window.webkitAudioContext;
+          this.ctx = new AudioCtx();
+        }
+        if (this.ctx.state === 'suspended') {
+          this.ctx.resume();
+        }
+      }
+
+      play(isLcars, type = 'chirp') {
+        if (!this.sfxEnabled) return;
+        this.init();
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+
+        if (isLcars) {
+          osc.type = 'sine';
+          if (type === 'warp') {
+            osc.frequency.setValueAtTime(620, now);
+            osc.frequency.exponentialRampToValueAtTime(1180, now + 0.12);
+          } else {
+            osc.frequency.setValueAtTime(980, now);
+            osc.frequency.setValueAtTime(1420, now + 0.04);
+          }
+          gain.gain.setValueAtTime(0.035, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.11);
+          osc.start(now);
+          osc.stop(now + 0.12);
+        } else {
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(140, now);
+          osc.frequency.exponentialRampToValueAtTime(38, now + 0.04);
+          gain.gain.setValueAtTime(0.06, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.045);
+          osc.start(now);
+          osc.stop(now + 0.05);
+        }
+      }
+
+      toggleAmbient() {
+        this.init();
+        this.ambientEnabled = !this.ambientEnabled;
+        if (this.ambientEnabled) {
+          // Deep, muted warm sub-bass & fifth drone (very low-pass filtered)
+          const freqs = [65.41, 98.00, 130.81, 164.81, 196.00];
+          const masterGain = this.ctx.createGain();
+          const filter = this.ctx.createBiquadFilter();
+          filter.type = 'lowpass';
+          filter.frequency.setValueAtTime(240, this.ctx.currentTime);
+
+          masterGain.gain.setValueAtTime(0.001, this.ctx.currentTime);
+          masterGain.gain.linearRampToValueAtTime(0.035, this.ctx.currentTime + 2.5);
+
+          filter.connect(masterGain);
+          masterGain.connect(this.ctx.destination);
+
+          freqs.forEach((f, idx) => {
+            const osc = this.ctx.createOscillator();
+            osc.type = idx < 2 ? 'sine' : 'triangle';
+            osc.frequency.setValueAtTime(f, this.ctx.currentTime);
+            osc.detune.setValueAtTime((idx - 2) * 4, this.ctx.currentTime);
+            osc.connect(filter);
+            osc.start();
+            this.ambientNodes.push(osc);
+          });
+        } else {
+          this.ambientNodes.forEach(n => {
+            try { n.stop(); n.disconnect(); } catch (e) {}
+          });
+          this.ambientNodes = [];
+        }
+        return this.ambientEnabled;
+      }
+    }
+
+    const audio = new GalleryAudioEngine();
+
+    /*************************************************************************
+     * 2. PORTFOLIO ARTWORKS & GUIDED TOUR STOPS DATA
+     *************************************************************************/
+    const PORTFOLIO_STOPS = [
+      {
+        id: 'storefront',
+        badge: 'STOP 01 // EXTERIOR ARCHITECTURE',
+        medium: '3D Curtain Wall & Night Streetscape',
+        title: 'Allston Night Storefront & Ceramic Window',
+        subtitle: '7-Bay Black Anodized Mullions • Sidewalk Trees • Low-Key Spotlights',
+        desc: 'Modeled from the nighttime street elevation: low-glare 2700K gallery track spotlights graze the rear ceramic plates and window pedestals while the dark asphalt foreground, timber street benches, and circular bike rack sit in natural evening shadow.',
+        zone: 'South Street Frontage (+Z)',
+        dims: '14.0m W × 3.8m H',
+        camPos: new THREE.Vector3(0.3, 1.95, 13.8),
+        lookAt: new THREE.Vector3(0.2, 1.65, -0.5),
+        pinPos: new THREE.Vector3(0.8, 1.2, 5.8)
+      },
+      {
+        id: 'main-hall',
+        badge: 'STOP 02 // INTERIOR ARCHITECTURE',
+        medium: 'Matte PBR Spatial & Lighting Study',
+        title: 'Muted Maple Hall & Exposed Joist Ceiling',
+        subtitle: 'Satin Ash-Maple Flooring • Charcoal Joists • Galvanized HVAC Trunk',
+        desc: 'Recreates the central gallery perspective with physically based roughness maps: soft pools of directional track light warm the matte maple floorboards while the exposed charcoal ceiling joists and ductwork recede into subtle shadow.',
+        zone: 'Central Gallery Axis',
+        dims: '14.0m × 10.0m × 3.8m',
+        camPos: new THREE.Vector3(-0.6, 1.72, 3.9),
+        lookAt: new THREE.Vector3(-0.2, 1.55, -3.8),
+        pinPos: new THREE.Vector3(-0.5, 2.75, -0.5)
+      },
+      {
+        id: 'west-photo-wall',
+        badge: 'STOP 03 // 2D PHOTOGRAPHY SERIES',
+        medium: 'Silver-Gelatin Architectural Prints',
+        title: 'Monochrome Brutalist & Miesian Studies',
+        subtitle: 'Chiaroscuro Concrete Light-Slit • Floating Projection Ledge',
+        desc: 'The West plaster wall features a large silver-gelatin architectural photograph framed in dark walnut alongside a matte white projection ledge supporting two smaller structural section studies.',
+        zone: 'West Gallery Wall (-X)',
+        dims: '3.6m Span × 1.8m H',
+        camPos: new THREE.Vector3(-2.5, 1.65, 1.4),
+        lookAt: new THREE.Vector3(-6.8, 1.6, 0.2),
+        pinPos: new THREE.Vector3(-6.75, 1.65, 1.4)
+      },
+      {
+        id: 'sculpture-court',
+        badge: 'STOP 04 // 3D SCULPTURE COURT',
+        medium: 'Patinated Bronze, Travertine & Bonsai',
+        title: 'Tri-Pedestal Sculpture Court',
+        subtitle: 'Raw Travertine Plinths • Dark Bronze Knot • Sculptural Bonsai',
+        desc: 'Three matte museum plinths anchor the main floor: a dark patinated bronze architectural knot, a tall column pedestal supporting an organic branching bonsai with muted terracotta fruit, and a carved travertine monolith.',
+        zone: 'Center Floor Plinths',
+        dims: '3 Plinths (0.9m – 1.36m H)',
+        camPos: new THREE.Vector3(-2.1, 1.65, 1.5),
+        lookAt: new THREE.Vector3(1.5, 1.4, -1.2),
+        pinPos: new THREE.Vector3(1.15, 1.85, -1.6)
+      },
+      {
+        id: 'floating-shelf',
+        badge: 'STOP 05 // MILLWORK & STONEWARE',
+        medium: 'Matte Ceramic & Smoked Glass Studies',
+        title: 'Partition Wall, Cantilevered Shelf & Oak Bench',
+        subtitle: '5 Matte Stoneware Vessels • Smoked Timber Gallery Bench',
+        desc: 'The mid-gallery partition wall divides the public exhibition hall from the rear passage, featuring a cantilevered shelf with five muted stoneware and smoked-glass vessels next to a low oak bench.',
+        zone: 'North-Center Partition',
+        dims: '2.2m Shelf • 5 Vessels',
+        camPos: new THREE.Vector3(-0.8, 1.6, 0.2),
+        lookAt: new THREE.Vector3(-0.8, 1.5, -3.5),
+        pinPos: new THREE.Vector3(-0.9, 1.65, -3.0)
+      },
+      {
+        id: 'ceramic-plate-wall',
+        badge: 'STOP 06 // CERAMIC INSTALLATION',
+        medium: 'Raw Terracotta & Oxidized Copper Chargers',
+        title: 'Allston Ceramic Plate & Teapot Wall',
+        subtitle: '7 Wall-Mounted Stoneware Chargers • Individual Cantilevered Shelves',
+        desc: 'Illuminated by dedicated narrow-beam track spotlights, seven warm terracotta and oxidized copper circular plates hover above individual wall shelves holding hand-thrown stoneware vessels.',
+        zone: 'East Showcase Wall',
+        dims: '5.2m Span × 2.2m H',
+        camPos: new THREE.Vector3(2.2, 1.65, 2.2),
+        lookAt: new THREE.Vector3(2.2, 1.6, -2.8),
+        pinPos: new THREE.Vector3(2.4, 1.8, -3.0)
+      },
+      {
+        id: 'leaning-canvas',
+        badge: 'STOP 07 // LARGE-SCALE MIXED MEDIA',
+        medium: 'Textured Crimson Relief & Muted Diptych',
+        title: 'Leaning Crimson Banquet Relief & Studies',
+        subtitle: 'Floor-Leaning Textured Canvas • Matted Architectural Drawings',
+        desc: 'Along the East gallery wall, a deep, weathered crimson relief canvas with muted stoneware plate motifs leans directly against the plaster wall beside two desaturated architectural color studies.',
+        zone: 'East Gallery Wall (+X)',
+        dims: '1.15m W × 2.15m H Relief',
+        camPos: new THREE.Vector3(1.2, 1.65, 0.8),
+        lookAt: new THREE.Vector3(6.8, 1.45, -0.3),
+        pinPos: new THREE.Vector3(6.55, 1.25, 0.2)
+      }
+    ];
+
+    /*************************************************************************
+     * 3. REALISTIC MATTE PBR TEXTURE & BUMP MAP GENERATORS
+     *************************************************************************/
+    function createPlasterNoiseTexture() {
+      const c = document.createElement('canvas');
+      c.width = 512;
+      c.height = 512;
+      const ctx = c.getContext('2d');
+      const imgData = ctx.createImageData(512, 512);
+      for (let i = 0; i < imgData.data.length; i += 4) {
+        const v = 212 + (Math.random() - 0.5) * 18;
+        imgData.data[i] = v;
+        imgData.data[i + 1] = v - 2;
+        imgData.data[i + 2] = v - 6;
+        imgData.data[i + 3] = 255;
+      }
+      ctx.putImageData(imgData, 0, 0);
+      const tex = new THREE.CanvasTexture(c);
+      tex.wrapS = THREE.RepeatWrapping;
+      tex.wrapT = THREE.RepeatWrapping;
+      tex.repeat.set(6, 6);
+      return tex;
+    }
+
+    function createMutedMapleFloorMaps() {
+      const colorCanvas = document.createElement('canvas');
+      colorCanvas.width = 1024;
+      colorCanvas.height = 1024;
+      const cCtx = colorCanvas.getContext('2d');
+
+      const roughCanvas = document.createElement('canvas');
+      roughCanvas.width = 1024;
+      roughCanvas.height = 1024;
+      const rCtx = roughCanvas.getContext('2d');
+
+      // Base muted honey-ash wood tone (desaturated, natural)
+      cCtx.fillStyle = '#997856';
+      cCtx.fillRect(0, 0, 1024, 1024);
+
+      rCtx.fillStyle = '#b0b0b0'; // High base roughness (~0.68)
+      rCtx.fillRect(0, 0, 1024, 1024);
+
+      const strips = 36;
+      const stripW = 1024 / strips;
+
+      for (let i = 0; i < strips; i++) {
+        let y = 0;
+        while (y < 1024) {
+          const plankH = 150 + Math.floor(Math.random() * 190);
+          const shift = (Math.random() - 0.5) * 14;
+          const r = Math.min(220, Math.max(110, 156 + shift));
+          const g = Math.min(190, Math.max(85, 122 + shift * 0.85));
+          const b = Math.min(155, Math.max(60, 86 + shift * 0.7));
+
+          cCtx.fillStyle = `rgb(${r},${g},${b})`;
+          cCtx.fillRect(i * stripW, y, stripW - 1.2, plankH - 1.2);
+
+          // Plank roughness variation so planks catch light subtly differently
+          const rVal = 155 + Math.floor((Math.random() - 0.5) * 32);
+          rCtx.fillStyle = `rgb(${rVal},${rVal},${rVal})`;
+          rCtx.fillRect(i * stripW, y, stripW - 1.2, plankH - 1.2);
+
+          // Fine wood grain fibers
+          cCtx.strokeStyle = 'rgba(65, 45, 25, 0.11)';
+          cCtx.lineWidth = 1;
+          for (let f = 0; f < 4; f++) {
+            cCtx.beginPath();
+            const gx = i * stripW + Math.random() * stripW;
+            cCtx.moveTo(gx, y);
+            cCtx.lineTo(gx + (Math.random() - 0.5) * 4, y + plankH);
+            cCtx.stroke();
+          }
+
+          y += plankH;
+        }
+      }
+
+      const colorMap = new THREE.CanvasTexture(colorCanvas);
+      colorMap.encoding = THREE.sRGBEncoding;
+      colorMap.wrapS = THREE.RepeatWrapping;
+      colorMap.wrapT = THREE.RepeatWrapping;
+      colorMap.repeat.set(3.5, 2.5);
+
+      const roughMap = new THREE.CanvasTexture(roughCanvas);
+      roughMap.wrapS = THREE.RepeatWrapping;
+      roughMap.wrapT = THREE.RepeatWrapping;
+      roughMap.repeat.set(3.5, 2.5);
+
+      return { colorMap, roughMap };
+    }
+
+    function addCanvasGrainAndVignette(ctx, w, h, strength = 14) {
+      const img = ctx.getImageData(0, 0, w, h);
+      const d = img.data;
+      for (let i = 0; i < d.length; i += 4) {
+        const n = (Math.random() - 0.5) * strength;
+        d[i] = Math.min(255, Math.max(0, d[i] + n));
+        d[i + 1] = Math.min(255, Math.max(0, d[i + 1] + n));
+        d[i + 2] = Math.min(255, Math.max(0, d[i + 2] + n));
+      }
+      ctx.putImageData(img, 0, 0);
+
+      // Subtle museum vignette
+      const grad = ctx.createRadialGradient(w / 2, h / 2, w * 0.25, w / 2, h / 2, w * 0.72);
+      grad.addColorStop(0, 'rgba(0,0,0,0)');
+      grad.addColorStop(1, 'rgba(10,8,6,0.28)');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, w, h);
+    }
+
+    function createArtworkTexture(style) {
+      const c = document.createElement('canvas');
+      c.width = 512;
+      c.height = 512;
+      const ctx = c.getContext('2d');
+
+      if (style === 'banquet') {
+        // Deep, weathered crimson fabric relief with muted stoneware plates
+        ctx.fillStyle = '#5e1916';
+        ctx.fillRect(0, 0, 512, 512);
+
+        for (let row = 0; row < 5; row++) {
+          for (let col = 0; col < 2; col++) {
+            const cx = col === 0 ? 142 : 370;
+            const cy = 65 + row * 95;
+            // Soft shadow under plate
+            ctx.fillStyle = 'rgba(15, 5, 5, 0.45)';
+            ctx.beginPath();
+            ctx.arc(cx + 5, cy + 6, 37, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Muted stoneware rim
+            ctx.fillStyle = '#c4beb2';
+            ctx.beginPath();
+            ctx.arc(cx, cy, 36, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = '#525e66';
+            ctx.lineWidth = 3;
+            ctx.stroke();
+
+            // Earthy ochre / umber center motif
+            ctx.fillStyle = (row + col) % 2 === 0 ? '#a87b32' : '#853c24';
+            ctx.beginPath();
+            ctx.arc(cx + 2, cy - 2, 16, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        }
+        // Central muted vessel form
+        ctx.fillStyle = '#b59659';
+        ctx.fillRect(232, 130, 48, 130);
+        ctx.fillStyle = '#78281f';
+        ctx.beginPath();
+        ctx.arc(256, 185, 28, 0, Math.PI * 2);
+        ctx.fill();
+        addCanvasGrainAndVignette(ctx, 512, 512, 22);
+      } else if (style === 'architectural-1') {
+        // Monochrome Chiaroscuro Architectural Photography (Tadao Ando / Mies vibe)
+        ctx.fillStyle = '#d8d4cb';
+        ctx.fillRect(0, 0, 512, 512);
+
+        // Dark charcoal mat inner window
+        ctx.fillStyle = '#18191b';
+        ctx.fillRect(52, 52, 408, 408);
+
+        // Concrete architectural shadows & light beam
+        const beamGrad = ctx.createLinearGradient(90, 70, 380, 420);
+        beamGrad.addColorStop(0, '#c8c4bc');
+        beamGrad.addColorStop(0.45, '#585a5e');
+        beamGrad.addColorStop(1, '#121316');
+        ctx.fillStyle = beamGrad;
+        ctx.beginPath();
+        ctx.moveTo(140, 60);
+        ctx.lineTo(290, 60);
+        ctx.lineTo(430, 440);
+        ctx.lineTo(90, 440);
+        ctx.closePath();
+        ctx.fill();
+
+        // Structural grid mullions
+        ctx.strokeStyle = '#101113';
+        ctx.lineWidth = 6;
+        ctx.strokeRect(52, 52, 408, 408);
+        ctx.beginPath();
+        ctx.moveTo(210, 52);
+        ctx.lineTo(210, 460);
+        ctx.moveTo(52, 280);
+        ctx.lineTo(460, 280);
+        ctx.stroke();
+        addCanvasGrainAndVignette(ctx, 512, 512, 18);
+      } else if (style === 'pastel-grid') {
+        // Desaturated Earth-Tone Architectural Color Study
+        ctx.fillStyle = '#CFC9BC';
+        ctx.fillRect(0, 0, 512, 512);
+        const palette = ['#485c4e', '#a67b56', '#8f4d3b', '#3f6663', '#9e8856', '#2b3a42'];
+        for (let x = 0; x < 4; x++) {
+          for (let y = 0; y < 4; y++) {
+            ctx.fillStyle = palette[(x * 3 + y) % palette.length];
+            ctx.fillRect(36 + x * 110, 36 + y * 110, 94, 94);
+            ctx.beginPath();
+            ctx.fillStyle = palette[(x + y + 2) % palette.length];
+            ctx.arc(83 + x * 110, 83 + y * 110, 25, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        }
+        addCanvasGrainAndVignette(ctx, 512, 512, 20);
+      } else if (style === 'blue-window') {
+        // Muted Prussian Blue & Raw Ochre Study on back-left wall
+        ctx.fillStyle = '#263859';
+        ctx.fillRect(0, 0, 512, 512);
+        ctx.fillStyle = '#9e8244';
+        ctx.fillRect(240, 110, 210, 340);
+        ctx.fillStyle = '#855832';
+        ctx.beginPath();
+        ctx.arc(340, 290, 70, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#c4bfb4';
+        ctx.lineWidth = 6;
+        ctx.strokeRect(72, 92, 148, 216);
+        addCanvasGrainAndVignette(ctx, 512, 512, 20);
+      } else {
+        // Warm Linen Matted Architectural Section Drawing
+        ctx.fillStyle = '#d4cfc2';
+        ctx.fillRect(0, 0, 512, 512);
+        ctx.fillStyle = '#bfb6a2';
+        ctx.fillRect(88, 88, 336, 336);
+        ctx.strokeStyle = '#2b2927';
+        ctx.lineWidth = 2.5;
+        ctx.strokeRect(88, 88, 336, 336);
+        for (let i = 0; i < 6; i++) {
+          ctx.strokeRect(118 + i * 46, 148, 30, 214);
+        }
+        addCanvasGrainAndVignette(ctx, 512, 512, 15);
+      }
+
+      const tex = new THREE.CanvasTexture(c);
+      tex.encoding = THREE.sRGBEncoding;
+      return tex;
+    }
+
+    /*************************************************************************
+     * 4. THREE.JS SCENE, ACES FILMIC RENDERER & DIRECTIONAL TRACK SPOTLIGHTS
+     *************************************************************************/
+    const container = document.getElementById('canvas-container');
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x040507);
+    scene.fog = new THREE.FogExp2(0x040507, 0.018);
+
+    const camera = new THREE.PerspectiveCamera(48, window.innerWidth / window.innerHeight, 0.1, 120);
+    camera.position.copy(PORTFOLIO_STOPS[0].camPos);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    // Physically Based Tone Mapping to prevent cartoon blowouts
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 0.65;
+    renderer.outputEncoding = THREE.sRGBEncoding;
+    container.appendChild(renderer.domElement);
+
+    const controls = new THREE.OrbitControls(camera, renderer.domElement);
+    controls.target.copy(PORTFOLIO_STOPS[0].lookAt);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.06;
+    controls.maxPolarAngle = Math.PI / 2 - 0.01;
+    controls.minDistance = 0.8;
+    controls.maxDistance = 32;
+
+    let cameraFlightActive = false;
+    const targetCamPos = new THREE.Vector3().copy(PORTFOLIO_STOPS[0].camPos);
+    const targetLookAt = new THREE.Vector3().copy(PORTFOLIO_STOPS[0].lookAt);
+
+    renderer.domElement.addEventListener('pointerdown', () => {
+      cameraFlightActive = false;
+    });
+
+    // Subtle low-intensity hemisphere fill so shadows have rich architectural depth
+    const hemiLight = new THREE.HemisphereLight(0xc2cee0, 0x1a1612, 0.16);
+    scene.add(hemiLight);
+
+    // Directional Sun/Moon Light
+    const sunLight = new THREE.DirectionalLight(0xffeacc, 0.06);
+    sunLight.position.set(8, 15, 12);
+    sunLight.castShadow = true;
+    sunLight.shadow.mapSize.width = 2048;
+    sunLight.shadow.mapSize.height = 2048;
+    sunLight.shadow.bias = -0.0005;
+    const d = 14;
+    sunLight.shadow.camera.left = -d;
+    sunLight.shadow.camera.right = d;
+    sunLight.shadow.camera.top = d;
+    sunLight.shadow.camera.bottom = -d;
+    scene.add(sunLight);
+
+    // Focused Museum Track Spotlights (Aimed specifically at walls & plinths)
+    const trackSpotlights = [];
+    const spotConfigs = [
+      // [posX, posY, posZ, targetX, targetY, targetZ, intensity, angle]
+      [-4.2, 3.35, 1.6, -6.9, 1.5, 1.6, 1.35, Math.PI / 4.5],    // West Photo Wall
+      [-4.2, 3.35, -1.6, -5.6, 1.5, -2.5, 1.15, Math.PI / 4.5],  // Rear-Left Blue Painting & Plinths
+      [0.0, 3.35, 1.2, -0.6, 0.8, 0.6, 1.4, Math.PI / 4.2],      // Foreground Still-Life Plinth
+      [0.0, 3.35, -1.2, -0.6, 1.4, -3.0, 1.35, Math.PI / 4.2],   // Floating Shelf & Bonsai Plinth
+      [3.2, 3.35, -1.2, 3.5, 1.6, -3.1, 1.55, Math.PI / 3.6],    // Ceramic Plate Showcase Wall
+      [4.2, 3.35, 0.6, 6.8, 1.2, 0.2, 1.45, Math.PI / 4.0],      // East Leaning Crimson Relief
+      [-1.5, 3.35, 3.8, -1.2, 0.8, 4.1, 1.15, Math.PI / 4.5],    // Storefront Window Display Left
+      [2.8, 3.35, 3.8, 3.2, 0.8, 4.1, 1.15, Math.PI / 4.5]       // Storefront Window Display Right
+    ];
+
+    spotConfigs.forEach(([px, py, pz, tx, ty, tz, inten, ang]) => {
+      const spot = new THREE.SpotLight(0xffdfb8, inten, 13.5, ang, 0.88, 1.8);
+      spot.position.set(px, py, pz);
+      spot.target.position.set(tx, ty, tz);
+      spot.castShadow = true;
+      spot.shadow.mapSize.width = 1024;
+      spot.shadow.mapSize.height = 1024;
+      spot.shadow.bias = -0.0006;
+      scene.add(spot);
+      scene.add(spot.target);
+      trackSpotlights.push({ light: spot, baseIntensity: inten });
+    });
+
+    /*************************************************************************
+     * 5. 6-TIER PROCEDURAL ARCHITECTURAL GALLERY CONSTRUCTION
+     *************************************************************************/
+    const W = 14.0;
+    const D = 10.0;
+    const H = 3.8;
+    const WALL_T = 0.18;
+
+    const plinthGroup = new THREE.Group();
+    const wallsNorthGroup = new THREE.Group();
+    const wallsSouthGroup = new THREE.Group();
+    const wallsWestGroup = new THREE.Group();
+    const wallsEastGroup = new THREE.Group();
+    const interiorJoineryGroup = new THREE.Group();
+    const roofGroup = new THREE.Group();
+
+    scene.add(
+      plinthGroup,
+      wallsNorthGroup,
+      wallsSouthGroup,
+      wallsWestGroup,
+      wallsEastGroup,
+      interiorJoineryGroup,
+      roofGroup
+    );
+
+    // Physically Grounded Matte Materials
+    const plasterTex = createPlasterNoiseTexture();
+    const mapleMaps = createMutedMapleFloorMaps();
+
+    const floorMat = new THREE.MeshStandardMaterial({
+      map: mapleMaps.colorMap,
+      roughnessMap: mapleMaps.roughMap,
+      bumpMap: mapleMaps.roughMap,
+      bumpScale: 0.003,
+      roughness: 0.68,
+      metalness: 0.02
+    });
+
+    const whiteWallMat = new THREE.MeshStandardMaterial({
+      color: 0xd8d5ce,
+      map: plasterTex,
+      bumpMap: plasterTex,
+      bumpScale: 0.0015,
+      roughness: 0.92,
+      metalness: 0.0
+    });
+
+    const pedestalMat = new THREE.MeshStandardMaterial({
+      color: 0xe0ddd6,
+      map: plasterTex,
+      roughness: 0.88,
+      metalness: 0.0
+    });
+
+    const darkMullionMat = new THREE.MeshStandardMaterial({
+      color: 0x121316,
+      roughness: 0.55,
+      metalness: 0.35
+    });
+
+    const ceilingDarkMat = new THREE.MeshStandardMaterial({
+      color: 0x26282b,
+      roughness: 0.92,
+      metalness: 0.05
+    });
+
+    const glassMat = new THREE.MeshPhysicalMaterial({
+      color: 0xc8d8e4,
+      transparent: true,
+      opacity: 0.14,
+      roughness: 0.15,
+      metalness: 0.05
+    });
+
+    const oakWoodMat = new THREE.MeshStandardMaterial({
+      color: 0x7c5836,
+      roughness: 0.78,
+      metalness: 0.0
+    });
+
+    const terracottaPlateMat = new THREE.MeshStandardMaterial({
+      color: 0x9e5028,
+      roughness: 0.52,
+      metalness: 0.25,
+      bumpMap: plasterTex,
+      bumpScale: 0.002
+    });
+
+    // --- TIER 1: STREETSCAPE, SIDEWALK & MATTE MAPLE FLOOR ---
+    const streetMesh = new THREE.Mesh(
+      new THREE.BoxGeometry(28, 0.16, 10),
+      new THREE.MeshStandardMaterial({ color: 0x101114, roughness: 0.95 })
+    );
+    streetMesh.position.set(0, -0.12, 12.0);
+    streetMesh.receiveShadow = true;
+    plinthGroup.add(streetMesh);
+
+    const sidewalkMesh = new THREE.Mesh(
+      new THREE.BoxGeometry(28, 0.18, 4.2),
+      new THREE.MeshStandardMaterial({ color: 0x3e4145, map: plasterTex, roughness: 0.92 })
+    );
+    sidewalkMesh.position.set(0, -0.04, 7.0);
+    sidewalkMesh.receiveShadow = true;
+    plinthGroup.add(sidewalkMesh);
+
+    const galleryFloorMesh = new THREE.Mesh(new THREE.BoxGeometry(W, 0.16, D), floorMat);
+    galleryFloorMesh.position.set(0, -0.08, 0);
+    galleryFloorMesh.receiveShadow = true;
+    plinthGroup.add(galleryFloorMesh);
+
+    // Street Benches
+    [-3.6, 1.5, 5.2].forEach(bx => {
+      const benchGroup = new THREE.Group();
+      const seat = new THREE.Mesh(new THREE.BoxGeometry(2.3, 0.08, 0.48), oakWoodMat);
+      seat.position.y = 0.44;
+      seat.castShadow = true;
+      benchGroup.add(seat);
+      [-0.95, 0.95].forEach(lx => {
+        const leg = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.42, 0.44), darkMullionMat);
+        leg.position.set(lx, 0.21, 0);
+        benchGroup.add(leg);
+      });
+      benchGroup.position.set(bx, 0.05, 5.55);
+      plinthGroup.add(benchGroup);
+    });
+
+    // Circular Sidewalk Bike Rack
+    const bikeRackGroup = new THREE.Group();
+    const ringMesh = new THREE.Mesh(new THREE.TorusGeometry(0.46, 0.028, 16, 48), darkMullionMat);
+    ringMesh.position.y = 0.5;
+    const crossBar = new THREE.Mesh(new THREE.BoxGeometry(0.88, 0.045, 0.035), darkMullionMat);
+    crossBar.position.y = 0.65;
+    bikeRackGroup.add(ringMesh, crossBar);
+    bikeRackGroup.position.set(-0.2, 0.05, 6.45);
+    plinthGroup.add(bikeRackGroup);
+
+    // Framing Sidewalk Street Trees (Muted deep olive foliage)
+    [-4.6, 5.8].forEach(tx => {
+      const treeGroup = new THREE.Group();
+      const trunk = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.07, 0.11, 3.6, 10),
+        new THREE.MeshStandardMaterial({ color: 0x241c16, roughness: 0.95 })
+      );
+      trunk.position.y = 1.8;
+      treeGroup.add(trunk);
+
+      const foliageMat = new THREE.MeshStandardMaterial({ color: 0x142018, roughness: 0.92 });
+      for (let i = 0; i < 7; i++) {
+        const leafCluster = new THREE.Mesh(new THREE.DodecahedronGeometry(0.52 + (i % 2) * 0.18, 1), foliageMat);
+        leafCluster.position.set(
+          Math.sin(i * 1.4) * 0.58,
+          2.5 + (i * 0.28),
+          Math.cos(i * 1.4) * 0.48
+        );
+        treeGroup.add(leafCluster);
+      }
+      treeGroup.position.set(tx, 0.05, 6.7);
+      plinthGroup.add(treeGroup);
+    });
+
+    // --- TIER 2 & 4: EXTERIOR WALLS & 7-BAY STOREFRONT CURTAIN WALL ---
+    const northWall = new THREE.Mesh(new THREE.BoxGeometry(W, H, WALL_T), whiteWallMat);
+    northWall.position.set(0, H / 2, -D / 2);
+    northWall.receiveShadow = true;
+    wallsNorthGroup.add(northWall);
+
+    const westWall = new THREE.Mesh(new THREE.BoxGeometry(WALL_T, H, D), whiteWallMat);
+    westWall.position.set(-W / 2, H / 2, 0);
+    westWall.receiveShadow = true;
+    wallsWestGroup.add(westWall);
+
+    const eastWall = new THREE.Mesh(new THREE.BoxGeometry(WALL_T, H, D), whiteWallMat);
+    eastWall.position.set(W / 2, H / 2, 0);
+    eastWall.receiveShadow = true;
+    wallsEastGroup.add(eastWall);
+
+    const numBays = 7;
+    const bayWidth = W / numBays;
+    for (let i = 0; i <= numBays; i++) {
+      const mullionX = -W / 2 + i * bayWidth;
+      const post = new THREE.Mesh(new THREE.BoxGeometry(0.07, H, 0.12), darkMullionMat);
+      post.position.set(mullionX, H / 2, D / 2);
+      wallsSouthGroup.add(post);
+    }
+    const topTransom = new THREE.Mesh(new THREE.BoxGeometry(W, 0.1, 0.12), darkMullionMat);
+    topTransom.position.set(0, H - 0.05, D / 2);
+    const botTransom = new THREE.Mesh(new THREE.BoxGeometry(W, 0.08, 0.12), darkMullionMat);
+    botTransom.position.set(0, 0.04, D / 2);
+    wallsSouthGroup.add(topTransom, botTransom);
+
+    const entryDoorGroup = new THREE.Group();
+    const doorPane = new THREE.Mesh(new THREE.BoxGeometry(bayWidth - 0.08, H - 0.18, 0.03), glassMat);
+    const doorHandle = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.9, 12), darkMullionMat);
+    doorHandle.position.set(0.7, 0, 0.05);
+    entryDoorGroup.add(doorPane, doorHandle);
+    entryDoorGroup.position.set(-W / 2 + bayWidth / 2, H / 2, D / 2);
+    wallsSouthGroup.add(entryDoorGroup);
+
+    for (let b = 1; b < numBays; b++) {
+      const cx = -W / 2 + b * bayWidth + bayWidth / 2;
+      const glassPane = new THREE.Mesh(new THREE.BoxGeometry(bayWidth - 0.06, H - 0.16, 0.025), glassMat);
+      glassPane.position.set(cx, H / 2, D / 2);
+      wallsSouthGroup.add(glassPane);
+    }
+
+    // --- TIER 5: PARTITIONS, MATTE PLINTHS, 3D SCULPTURES & 2D ARTWORKS ---
+    const mainPartition = new THREE.Mesh(new THREE.BoxGeometry(8.8, H, WALL_T), whiteWallMat);
+    mainPartition.position.set(2.5, H / 2, -3.2);
+    mainPartition.castShadow = true;
+    mainPartition.receiveShadow = true;
+    interiorJoineryGroup.add(mainPartition);
+
+    const leftWingPartition = new THREE.Mesh(new THREE.BoxGeometry(2.6, H, WALL_T), whiteWallMat);
+    leftWingPartition.position.set(-5.7, H / 2, -2.6);
+    leftWingPartition.castShadow = true;
+    leftWingPartition.receiveShadow = true;
+    interiorJoineryGroup.add(leftWingPartition);
+
+    // Floating Wall Shelf + 5 Muted Stoneware/Smoked-Glass Vessels
+    const floatingShelf = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.055, 0.28), pedestalMat);
+    floatingShelf.position.set(-0.6, 1.48, -3.02);
+    floatingShelf.castShadow = true;
+    interiorJoineryGroup.add(floatingShelf);
+
+    const vesselTones = [0x3d5238, 0x9c6b30, 0x7d3226, 0x385866, 0x9e9578];
+    vesselTones.forEach((col, idx) => {
+      const jar = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.042, 0.05, 0.16, 16),
+        new THREE.MeshStandardMaterial({ color: col, roughness: 0.55, metalness: 0.05 })
+      );
+      jar.position.set(-1.35 + idx * 0.38, 1.59, -3.02);
+      jar.castShadow = true;
+      interiorJoineryGroup.add(jar);
+    });
+
+    const galleryBench = new THREE.Mesh(new THREE.BoxGeometry(1.15, 0.45, 0.46), oakWoodMat);
+    galleryBench.position.set(0.3, 0.225, -2.85);
+    galleryBench.castShadow = true;
+    galleryBench.receiveShadow = true;
+    interiorJoineryGroup.add(galleryBench);
+
+    // Seven Matte Terracotta & Oxidized Copper Wall Chargers + Shelves
+    for (let p = 0; p < 7; p++) {
+      const px = 1.4 + p * 0.78;
+      const plate = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.14, 0.025, 24), terracottaPlateMat);
+      plate.rotation.x = Math.PI / 2;
+      plate.position.set(px, 1.78, -3.09);
+      plate.castShadow = true;
+      interiorJoineryGroup.add(plate);
+
+      const miniShelf = new THREE.Mesh(new THREE.BoxGeometry(0.52, 0.038, 0.22), pedestalMat);
+      miniShelf.position.set(px, 1.34, -3.0);
+      miniShelf.castShadow = true;
+      interiorJoineryGroup.add(miniShelf);
+
+      const vessel = new THREE.Mesh(
+        new THREE.SphereGeometry(0.062, 16, 12),
+        new THREE.MeshStandardMaterial({ color: p % 2 === 0 ? 0x854c32 : 0xa89f91, roughness: 0.72 })
+      );
+      vessel.position.set(px, 1.42, -3.0);
+      interiorJoineryGroup.add(vessel);
+    }
+
+    // Matte Museum Pedestals & Grounded 3D Sculptures
+    function createPedestalWithSculpture(x, z, h, w, type) {
+      const group = new THREE.Group();
+      const base = new THREE.Mesh(new THREE.BoxGeometry(w, h, w), pedestalMat);
+      base.position.y = h / 2;
+      base.castShadow = true;
+      base.receiveShadow = true;
+      group.add(base);
+
+      const cap = new THREE.Mesh(new THREE.BoxGeometry(w + 0.04, 0.03, w + 0.04), pedestalMat);
+      cap.position.y = h + 0.015;
+      group.add(cap);
+
+      const topY = h + 0.03;
+
+      if (type === 'bonsai') {
+        const pot = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.07, 0.22), darkMullionMat);
+        pot.position.y = topY + 0.035;
+        group.add(pot);
+
+        const trunkMat = new THREE.MeshStandardMaterial({ color: 0x241b16, roughness: 0.88 });
+        const mainStem = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.042, 0.66, 10), trunkMat);
+        mainStem.position.y = topY + 0.35;
+        mainStem.rotation.z = 0.12;
+        group.add(mainStem);
+
+        for (let b = 0; b < 6; b++) {
+          const branch = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 0.018, 0.36, 8), trunkMat);
+          branch.position.set(Math.sin(b * 1.1) * 0.12, topY + 0.42 + b * 0.055, Math.cos(b * 1.1) * 0.12);
+          branch.rotation.set(Math.cos(b) * 0.6, b, Math.sin(b) * 0.7);
+          group.add(branch);
+
+          const fruit = new THREE.Mesh(
+            new THREE.SphereGeometry(0.04, 12, 12),
+            new THREE.MeshStandardMaterial({ color: 0xa85818, roughness: 0.65 })
+          );
+          fruit.position.set(Math.sin(b * 1.1) * 0.21, topY + 0.45 + b * 0.055, Math.cos(b * 1.1) * 0.21);
+          group.add(fruit);
+        }
+      } else if (type === 'StillLife') {
+        const platter = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.21, 0.14, 0.035, 24),
+          new THREE.MeshStandardMaterial({ color: 0x1c2420, roughness: 0.68 })
+        );
+        platter.position.y = topY + 0.02;
+        group.add(platter);
+        [-0.06, 0.06].forEach((ox, i) => {
+          const orb = new THREE.Mesh(
+            new THREE.DodecahedronGeometry(0.058, 1),
+            new THREE.MeshStandardMaterial({ color: i === 0 ? 0x7d3522 : 0x4e632c, roughness: 0.72 })
+          );
+          orb.position.set(ox, topY + 0.065, (i - 0.5) * 0.05);
+          group.add(orb);
+        });
+      } else if (type === 'torus') {
+        const knot = new THREE.Mesh(
+          new THREE.TorusKnotGeometry(0.105, 0.03, 72, 16),
+          new THREE.MeshStandardMaterial({ color: 0x2b2620, roughness: 0.52, metalness: 0.65 })
+        );
+        knot.position.y = topY + 0.14;
+        knot.castShadow = true;
+        group.add(knot);
+      } else if (type === 'whiteForm') {
+        const mesh = new THREE.Mesh(
+          new THREE.IcosahedronGeometry(0.15, 2),
+          new THREE.MeshStandardMaterial({ color: 0xcfcac0, map: plasterTex, roughness: 0.85 })
+        );
+        mesh.scale.set(1.1, 0.82, 0.9);
+        mesh.position.y = topY + 0.12;
+        mesh.castShadow = true;
+        group.add(mesh);
+      } else if (type === 'crimsonFold') {
+        const cone = new THREE.Mesh(
+          new THREE.ConeGeometry(0.15, 0.32, 5),
+          new THREE.MeshStandardMaterial({ color: 0x4f151b, roughness: 0.75 })
+        );
+        cone.position.y = topY + 0.16;
+        cone.castShadow = true;
+        group.add(cone);
+      }
+
+      group.position.set(x, 0, z);
+      interiorJoineryGroup.add(group);
+    }
+
+    createPedestalWithSculpture(-0.65, 0.65, 0.98, 0.48, 'StillLife');
+    createPedestalWithSculpture(1.15, -1.6, 1.36, 0.42, 'bonsai');
+    createPedestalWithSculpture(2.45, 0.55, 0.96, 0.48, 'torus');
+    createPedestalWithSculpture(-3.7, -0.4, 0.82, 0.44, 'whiteForm');
+    createPedestalWithSculpture(-3.7, -2.0, 1.15, 0.42, 'crimsonFold');
+
+    [-2.4, 0.2, 2.8, 4.8].forEach((wx, idx) => {
+      createPedestalWithSculpture(wx, 4.1, 0.85 + (idx % 2) * 0.22, 0.46, idx % 2 === 0 ? 'whiteForm' : 'StillLife');
+    });
+
+    // 2D Framed Portfolio Artworks (Matte non-reflective finish)
+    const westArtTex = createArtworkTexture('architectural-1');
+    const westArtFrame = new THREE.Mesh(
+      new THREE.BoxGeometry(0.05, 1.45, 1.15),
+      new THREE.MeshStandardMaterial({ map: westArtTex, roughness: 0.78, metalness: 0.0 })
+    );
+    westArtFrame.position.set(-W / 2 + 0.12, 1.62, 1.85);
+    westArtFrame.castShadow = true;
+    wallsWestGroup.add(westArtFrame);
+
+    const westLedge = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.06, 1.85), pedestalMat);
+    westLedge.position.set(-W / 2 + 0.2, 1.32, -0.35);
+    westLedge.castShadow = true;
+    wallsWestGroup.add(westLedge);
+
+    [-0.75, -0.05].forEach(zPos => {
+      const smallPrint = new THREE.Mesh(
+        new THREE.BoxGeometry(0.025, 0.48, 0.38),
+        new THREE.MeshStandardMaterial({ map: createArtworkTexture('drawing'), roughness: 0.82 })
+      );
+      smallPrint.position.set(-W / 2 + 0.22, 1.58, zPos);
+      smallPrint.rotation.z = -0.08;
+      wallsWestGroup.add(smallPrint);
+    });
+
+    const bluePainting = new THREE.Mesh(
+      new THREE.BoxGeometry(0.62, 0.68, 0.04),
+      new THREE.MeshStandardMaterial({ map: createArtworkTexture('blue-window'), roughness: 0.78 })
+    );
+    bluePainting.position.set(-5.6, 1.72, -2.48);
+    interiorJoineryGroup.add(bluePainting);
+
+    const pastelTex = createArtworkTexture('pastel-grid');
+    [-2.1, -1.2].forEach(zPos => {
+      const sqPainting = new THREE.Mesh(
+        new THREE.BoxGeometry(0.04, 0.68, 0.68),
+        new THREE.MeshStandardMaterial({ map: pastelTex, roughness: 0.8 })
+      );
+      sqPainting.position.set(W / 2 - 0.11, 1.68, zPos);
+      wallsEastGroup.add(sqPainting);
+    });
+
+    const banquetTex = createArtworkTexture('banquet');
+    const leaningCanvas = new THREE.Mesh(
+      new THREE.BoxGeometry(0.15, 2.15, 1.15),
+      new THREE.MeshStandardMaterial({
+        map: banquetTex,
+        bumpMap: plasterTex,
+        bumpScale: 0.003,
+        roughness: 0.86
+      })
+    );
+    leaningCanvas.position.set(W / 2 - 0.32, 1.05, 0.25);
+    leaningCanvas.rotation.z = 0.11;
+    leaningCanvas.castShadow = true;
+    wallsEastGroup.add(leaningCanvas);
+
+    const eastForegroundFrame = new THREE.Mesh(
+      new THREE.BoxGeometry(0.045, 1.05, 0.85),
+      new THREE.MeshStandardMaterial({ map: createArtworkTexture('drawing'), roughness: 0.82 })
+    );
+    eastForegroundFrame.position.set(W / 2 - 0.11, 1.62, 2.55);
+    wallsEastGroup.add(eastForegroundFrame);
+
+    // --- TIER 6: EXPOSED CHARCOAL JOIST CEILING, HVAC TRUNK & TRACK RAILS ---
+    const roofSlab = new THREE.Mesh(new THREE.BoxGeometry(W + 0.4, 0.14, D + 0.4), ceilingDarkMat);
+    roofSlab.position.set(0, H + 0.07, 0);
+    roofGroup.add(roofSlab);
+
+    const numJoists = 22;
+    for (let j = 0; j < numJoists; j++) {
+      const jz = -D / 2 + 0.25 + j * ((D - 0.5) / (numJoists - 1));
+      const joist = new THREE.Mesh(new THREE.BoxGeometry(W - 0.2, 0.24, 0.07), ceilingDarkMat);
+      joist.position.set(0, H - 0.12, jz);
+      roofGroup.add(joist);
+    }
+
+    const hvacMat = new THREE.MeshStandardMaterial({ color: 0x3d4045, roughness: 0.68, metalness: 0.35 });
+    const hvacTrunk = new THREE.Mesh(new THREE.BoxGeometry(0.75, 0.28, 6.8), hvacMat);
+    hvacTrunk.position.set(0.6, H - 0.26, -0.4);
+    roofGroup.add(hvacTrunk);
+
+    const trackRailMat = new THREE.MeshStandardMaterial({ color: 0xc8c6c0, roughness: 0.7 });
+    [-4.2, 0.0, 4.2].forEach(tx => {
+      const rail = new THREE.Mesh(new THREE.BoxGeometry(0.045, 0.035, 8.2), trackRailMat);
+      rail.position.set(tx, H - 0.38, 0.2);
+      roofGroup.add(rail);
+
+      for (let c = -3.2; c <= 3.6; c += 1.35) {
+        const can = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.05, 0.14, 12), trackRailMat);
+        can.position.set(tx, H - 0.46, c);
+        can.rotation.z = tx < 0 ? 0.35 : (tx > 0 ? -0.35 : 0);
+        roofGroup.add(can);
+      }
+    });
+
+    /*************************************************************************
+     * 6. CAD MODULES (EXPLODE, EXPOSURE, SOLAR STUDY, HOTSPOTS, DOOR, UNITS)
+     *************************************************************************/
+    let explodeProgress = 0;
+    let hotspotsVisible = true;
+    let currentUnitMode = 0;
+
+    function applyExplode(amount) {
+      explodeProgress = amount;
+      roofGroup.position.y = amount * 3.6;
+      interiorJoineryGroup.position.y = amount * 1.2;
+
+      wallsSouthGroup.position.z = amount * 2.8;
+      wallsNorthGroup.position.z = -amount * 2.4;
+      wallsWestGroup.position.x = -amount * 2.4;
+      wallsEastGroup.position.x = amount * 2.4;
+
+      const pct = Math.round(amount * 100);
+      const label = amount === 0 ? '0% (ASSEMBLED)' : `${pct}% EXPLODED`;
+      document.querySelectorAll('.explode-readout').forEach(el => el.innerText = label);
+    }
+
+    function updateSunTime(hour) {
+      const t = (hour - 6) / 16;
+      const sunAngle = Math.PI * (t - 0.5);
+      const sunRadius = 24;
+
+      sunLight.position.x = Math.sin(sunAngle) * sunRadius;
+      sunLight.position.y = Math.max(0.4, Math.cos(sunAngle) * sunRadius);
+      sunLight.position.z = 14;
+
+      const isNight = (hour >= 18.5 || hour < 6.5);
+      if (hour < 8 || (hour > 17.0 && hour < 18.5)) {
+        sunLight.color.setHex(0xd96b27);
+        sunLight.intensity = 0.45;
+        hemiLight.intensity = 0.22;
+        scene.background.setHex(0x0c0807);
+        scene.fog.color.setHex(0x0c0807);
+      } else if (!isNight) {
+        sunLight.color.setHex(0xf5efe6);
+        sunLight.intensity = 0.75;
+        hemiLight.intensity = 0.36;
+        scene.background.setHex(0x12161c);
+        scene.fog.color.setHex(0x12161c);
+      } else {
+        sunLight.intensity = 0.03;
+        hemiLight.intensity = 0.14;
+        scene.background.setHex(0x040507);
+        scene.fog.color.setHex(0x040507);
+      }
+
+      trackSpotlights.forEach(s => {
+        s.light.intensity = isNight ? s.baseIntensity : s.baseIntensity * 0.65;
+      });
+
+      const hrs = Math.floor(hour).toString().padStart(2, '0');
+      const mins = Math.round((hour % 1) * 60).toString().padStart(2, '0');
+      const tag = isNight ? 'NIGHT' : (hour > 17 || hour < 8 ? 'DUSK' : 'DAY');
+      document.getElementById('time-readout').innerText = `${hrs}:${mins} ${tag}`;
+    }
+
+    const hotspotLayer = document.getElementById('hotspot-layer');
+    PORTFOLIO_STOPS.forEach((spot, index) => {
+      const pin = document.createElement('button');
+      pin.id = `pin-${spot.id}`;
+      pin.className = 'hotspot-pin';
+      pin.innerHTML = `<span>0${index + 1}</span> <span>${spot.title.split('&')[0].trim()}</span>`;
+      pin.addEventListener('click', () => {
+        const isLcars = document.body.getAttribute('data-style') === 'lcars';
+        audio.play(isLcars, 'chirp');
+        goToStop(index);
+      });
+      hotspotLayer.appendChild(pin);
+    });
+
+    function updateHotspotsScreenPositions() {
+      if (!hotspotsVisible || explodeProgress > 0.08) {
+        hotspotLayer.style.display = 'none';
+        return;
+      }
+      hotspotLayer.style.display = 'block';
+
+      const tempV = new THREE.Vector3();
+      PORTFOLIO_STOPS.forEach(spot => {
+        const pin = document.getElementById(`pin-${spot.id}`);
+        if (!pin) return;
+
+        tempV.copy(spot.pinPos);
+        tempV.project(camera);
+
+        if (tempV.z > 1) {
+          pin.style.display = 'none';
+          return;
+        }
+        pin.style.display = 'flex';
+
+        const x = (tempV.x * 0.5 + 0.5) * window.innerWidth;
+        const y = (-(tempV.y * 0.5) + 0.5) * window.innerHeight;
+        pin.style.left = `${x}px`;
+        pin.style.top = `${y}px`;
+      });
+    }
+
+    /*************************************************************************
+     * 7. GUIDED TOUR NAVIGATION & UI EVENT BINDINGS
+     *************************************************************************/
+    let currentStopIndex = 0;
+    let autoTourInterval = null;
+
+    function goToStop(index) {
+      currentStopIndex = (index + PORTFOLIO_STOPS.length) % PORTFOLIO_STOPS.length;
+      const stop = PORTFOLIO_STOPS[currentStopIndex];
+
+      targetCamPos.copy(stop.camPos);
+      targetLookAt.copy(stop.lookAt);
+      cameraFlightActive = true;
+
+      document.getElementById('work-badge').innerText = stop.badge;
+      document.getElementById('work-medium').innerText = stop.medium;
+      document.getElementById('work-title').innerText = stop.title;
+      document.getElementById('work-subtitle').innerText = stop.subtitle;
+      document.getElementById('work-desc').innerText = stop.desc;
+      document.getElementById('work-zone').innerText = stop.zone;
+      document.getElementById('work-dims').innerText = stop.dims;
+
+      document.querySelectorAll('.tour-stop-btn').forEach((btn, idx) => {
+        btn.classList.toggle('active', idx === currentStopIndex);
+      });
+    }
+
+    document.querySelectorAll('.tour-stop-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const isLcars = document.body.getAttribute('data-style') === 'lcars';
+        audio.play(isLcars, 'chirp');
+        goToStop(parseInt(btn.dataset.stop, 10));
+      });
+    });
+
+    document.getElementById('btn-prev-stop').addEventListener('click', () => {
+      audio.play(document.body.getAttribute('data-style') === 'lcars', 'chirp');
+      goToStop(currentStopIndex - 1);
+    });
+
+    document.getElementById('btn-next-stop').addEventListener('click', () => {
+      audio.play(document.body.getAttribute('data-style') === 'lcars', 'chirp');
+      goToStop(currentStopIndex + 1);
+    });
+
+    document.getElementById('btn-auto-tour').addEventListener('click', (e) => {
+      const isLcars = document.body.getAttribute('data-style') === 'lcars';
+      audio.play(isLcars, 'warp');
+      if (autoTourInterval) {
+        clearInterval(autoTourInterval);
+        autoTourInterval = null;
+        e.currentTarget.classList.remove('active');
+        e.currentTarget.innerText = '▶ AUTO TOUR';
+      } else {
+        goToStop(currentStopIndex + 1);
+        autoTourInterval = setInterval(() => {
+          goToStop(currentStopIndex + 1);
+        }, 5500);
+        e.currentTarget.classList.add('active');
+        e.currentTarget.innerText = '⏸ PAUSE TOUR';
+      }
+    });
+
+    // Exposure Slider
+    document.getElementById('slider-exposure').addEventListener('input', (e) => {
+      const val = parseFloat(e.target.value);
+      renderer.toneMappingExposure = val;
+      document.getElementById('exposure-readout').innerText = `${val.toFixed(2)} EV`;
+    });
+
+    // Sun, Explode & Door Sliders
+    document.getElementById('slider-sun').addEventListener('input', (e) => {
+      updateSunTime(parseFloat(e.target.value));
+    });
+
+    document.getElementById('slider-explode').addEventListener('input', (e) => {
+      applyExplode(parseFloat(e.target.value));
+    });
+
+    document.getElementById('slider-door').addEventListener('input', (e) => {
+      const val = parseFloat(e.target.value);
+      entryDoorGroup.position.x = (-W / 2 + bayWidth / 2) + val * 1.65;
+      document.getElementById('door-readout').innerText = val === 0 ? 'CLOSED' : `${Math.round(val * 100)}% OPEN`;
+    });
+
+    // Cutaways
+    document.querySelectorAll('[data-cut]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        audio.play(document.body.getAttribute('data-style') === 'lcars', 'chirp');
+        document.querySelectorAll('[data-cut]').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        const mode = btn.dataset.cut;
+        roofGroup.visible = (mode === 'full');
+        wallsSouthGroup.visible = (mode !== 'plan');
+        wallsWestGroup.visible = (mode !== 'plan');
+        wallsEastGroup.visible = (mode !== 'plan');
+      });
+    });
+
+    // Matte Flooring Swapper
+    document.querySelectorAll('[data-floor]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        audio.play(document.body.getAttribute('data-style') === 'lcars', 'chirp');
+        document.querySelectorAll('[data-floor]').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        const mode = btn.dataset.floor;
+        if (mode === 'maple') {
+          floorMat.map = mapleMaps.colorMap;
+          floorMat.color.setHex(0xffffff);
+          floorMat.roughness = 0.68;
+        } else if (mode === 'concrete') {
+          floorMat.map = plasterTex;
+          floorMat.color.setHex(0x6e7073);
+          floorMat.roughness = 0.86;
+        } else {
+          floorMat.map = plasterTex;
+          floorMat.color.setHex(0x22252a);
+          floorMat.roughness = 0.78;
+        }
+        floorMat.needsUpdate = true;
+      });
+    });
+
+    document.getElementById('btn-toggle-pins').addEventListener('click', (e) => {
+      hotspotsVisible = !hotspotsVisible;
+      e.currentTarget.classList.toggle('active', hotspotsVisible);
+      e.currentTarget.innerText = hotspotsVisible ? '📍 PINS: ON' : '📍 PINS: OFF';
+    });
+
+    document.getElementById('btn-eye-level').addEventListener('click', () => {
+      audio.play(document.body.getAttribute('data-style') === 'lcars', 'chirp');
+      targetCamPos.set(-0.5, 1.68, 2.8);
+      targetLookAt.set(-0.2, 1.62, -2.5);
+      cameraFlightActive = true;
+    });
+
+    function toggleTheme() {
+      const body = document.body;
+      const next = body.getAttribute('data-style') === 'lcars' ? 'eink' : 'lcars';
+      body.setAttribute('data-style', next);
+      const isLcars = next === 'lcars';
+      audio.play(isLcars, 'warp');
+      document.getElementById('btn-theme').innerText = isLcars ? '🌓 UI: LCARS [T]' : '📄 UI: DIN E-INK [T]';
+      document.getElementById('telemetry-stamp').innerText = isLcars
+        ? 'SD 2026.291 // LOW-KEY PBR'
+        : 'DIN 1451 // 2026-10-18';
+    }
+    document.getElementById('btn-theme').addEventListener('click', toggleTheme);
+
+    document.getElementById('btn-audio').addEventListener('click', (e) => {
+      audio.sfxEnabled = !audio.sfxEnabled;
+      e.currentTarget.classList.toggle('active', audio.sfxEnabled);
+      e.currentTarget.innerText = audio.sfxEnabled ? '🔊 SFX: ON [S]' : '🔇 SFX: OFF [S]';
+    });
+
+    document.getElementById('btn-ambient').addEventListener('click', (e) => {
+      const on = audio.toggleAmbient();
+      e.currentTarget.classList.toggle('active', on);
+      e.currentTarget.innerText = on ? '🎵 AMBIENT: ON [M]' : '🎵 AMBIENT: OFF [M]';
+    });
+
+    document.getElementById('btn-units').addEventListener('click', (e) => {
+      audio.play(document.body.getAttribute('data-style') === 'lcars', 'chirp');
+      currentUnitMode = (currentUnitMode + 1) % 3;
+      if (currentUnitMode === 0) {
+        e.currentTarget.innerText = '📐 UNITS: METRIC [m]';
+        document.getElementById('dim-readout').innerText = '14.0m × 10.0m';
+        document.getElementById('area-readout').innerText = '140.0 m²';
+      } else if (currentUnitMode === 1) {
+        e.currentTarget.innerText = '📐 UNITS: IMPERIAL [ft]';
+        document.getElementById('dim-readout').innerText = '45.9ft × 32.8ft';
+        document.getElementById('area-readout').innerText = '1,506 sq ft';
+      } else {
+        e.currentTarget.innerText = '📐 UNITS: TSUBO [坪]';
+        document.getElementById('dim-readout').innerText = '7.7 Ken × 5.5 Ken';
+        document.getElementById('area-readout').innerText = '42.3 Tsubo';
+      }
+    });
+
+    let zenActive = false;
+    function toggleZen() {
+      zenActive = !zenActive;
+      ['hud-header', 'hud-left', 'hud-right', 'hud-bottom'].forEach(id => {
+        document.getElementById(id).classList.toggle('zen-hidden', zenActive);
+      });
+      document.getElementById('btn-exit-zen').classList.toggle('hidden', !zenActive);
+    }
+    document.getElementById('btn-zen').addEventListener('click', toggleZen);
+    document.getElementById('btn-exit-zen').addEventListener('click', toggleZen);
+
+    const notesInput = document.getElementById('curator-notes');
+    notesInput.value = localStorage.getItem('allston_gallery_notes') || '';
+    notesInput.addEventListener('input', () => {
+      localStorage.setItem('allston_gallery_notes', notesInput.value);
+    });
+
+    document.getElementById('btn-export-txt').addEventListener('click', () => {
+      const content = [
+        'ALLSTON GALLERY PAVILION // CURATOR & PORTFOLIO SPECIFICATION',
+        '=============================================================',
+        `Active Tour Stop: ${PORTFOLIO_STOPS[currentStopIndex].title}`,
+        `Dimensions: 14.0m x 10.0m x 3.8m`,
+        `Exposure: ${renderer.toneMappingExposure.toFixed(2)} EV (ACES Filmic)`,
+        '',
+        'CURATOR NOTES:',
+        notesInput.value || '(No custom notes entered)'
+      ].join('\n');
+      const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'Portfolio-Gallery-Curator-Notes.txt';
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+
+    document.getElementById('btn-download-html').addEventListener('click', () => {
+      const isLcars = document.body.getAttribute('data-style') === 'lcars';
+      audio.play(isLcars, 'warp');
+      const cleanHTML = '<!DOCTYPE html>\n' + document.documentElement.outerHTML;
+      const blob = new Blob([cleanHTML], { type: 'text/html;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'Allston-Portfolio-Gallery-Matte.html';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    });
+
+    const keysPressed = {};
+    window.addEventListener('keydown', (e) => {
+      if (document.activeElement === notesInput) return;
+      const k = e.key.toLowerCase();
+      keysPressed[k] = true;
+
+      if (k === 't') toggleTheme();
+      if (k === 's') document.getElementById('btn-audio').click();
+      if (k === 'm') document.getElementById('btn-ambient').click();
+      if (k === 'z') toggleZen();
+    });
+
+    window.addEventListener('keyup', (e) => {
+      keysPressed[e.key.toLowerCase()] = false;
+    });
+
+    function processWalkMovement() {
+      const moveSpeed = 0.075;
+      const forward = new THREE.Vector3();
+      camera.getWorldDirection(forward);
+      forward.y = 0;
+      forward.normalize();
+
+      const right = new THREE.Vector3().crossVectors(forward, new THREE.Vector3(0, 1, 0)).normalize();
+      const delta = new THREE.Vector3();
+
+      if (keysPressed['w'] || keysPressed['arrowup']) delta.addScaledVector(forward, moveSpeed);
+      if (keysPressed['s'] || keysPressed['arrowdown']) delta.addScaledVector(forward, -moveSpeed);
+      if (keysPressed['a'] || keysPressed['arrowleft']) delta.addScaledVector(right, -moveSpeed);
+      if (keysPressed['d'] || keysPressed['arrowright']) delta.addScaledVector(right, moveSpeed);
+
+      if (delta.lengthSq() > 0) {
+        cameraFlightActive = false;
+        camera.position.add(delta);
+        controls.target.add(delta);
+      }
+    }
+
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    /*************************************************************************
+     * 8. MAIN ANIMATION & RENDER LOOP
+     *************************************************************************/
+    updateSunTime(21.0);
+
+    function animate() {
+      requestAnimationFrame(animate);
+
+      processWalkMovement();
+
+      if (cameraFlightActive) {
+        camera.position.lerp(targetCamPos, 0.055);
+        controls.target.lerp(targetLookAt, 0.055);
+        if (camera.position.distanceTo(targetCamPos) < 0.03) {
+          cameraFlightActive = false;
+        }
+      }
+
+      controls.update();
+      updateHotspotsScreenPositions();
+      renderer.render(scene, camera);
+    }
+
+    animate();
+  </script>
+</body>
+</html>

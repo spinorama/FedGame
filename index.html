@@ -1,0 +1,1090 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>AOL Federation II - DataSpace Terminal</title>
+<style>
+  :root {
+    --bg: #080c0a;
+    --panel: #0e1612;
+    --border: #1f3a2c;
+    --text: #33ff77;
+    --dim: #1d9947;
+    --amber: #ffb000;
+    --cyan: #00e5ff;
+    --danger: #ff4444;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Courier New", Courier, monospace;
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  header {
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    padding: 8px 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 12px;
+    flex-shrink: 0;
+    gap: 8px;
+  }
+  .hud-stats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .hud-label { color: var(--dim); }
+  .hud-val { color: var(--amber); font-weight: bold; }
+  #drawer-toggle {
+    display: none;
+    background: #132a1d;
+    color: var(--cyan);
+    border: 1px solid var(--cyan);
+    font-family: inherit;
+    font-size: 11px;
+    font-weight: bold;
+    padding: 5px 8px;
+    border-radius: 3px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  main {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 1fr 290px;
+    overflow: hidden;
+    position: relative;
+  }
+  #terminal {
+    padding: 12px 14px;
+    overflow-y: auto;
+    line-height: 1.45;
+    font-size: 14px;
+    white-space: pre-wrap;
+    scroll-behavior: smooth;
+  }
+  .sidebar {
+    background: var(--panel);
+    border-left: 1px solid var(--border);
+    padding: 12px;
+    font-size: 12px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .box {
+    border: 1px solid var(--border);
+    padding: 8px;
+    background: #060a08;
+  }
+  .box-title {
+    color: var(--cyan);
+    font-weight: bold;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 4px;
+    margin-bottom: 6px;
+    text-transform: uppercase;
+  }
+
+  /* Bottom Control Deck (Mobile + Desktop Quick Actions) */
+  #control-deck {
+    background: var(--panel);
+    border-top: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+  }
+  #context-bar {
+    display: flex;
+    gap: 6px;
+    padding: 8px 10px;
+    overflow-x: auto;
+    border-bottom: 1px solid var(--border);
+    scrollbar-width: none;
+  }
+  #context-bar::-webkit-scrollbar { display: none; }
+  .ctx-btn {
+    background: #142e1f;
+    color: var(--amber);
+    border: 1px solid var(--amber);
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: bold;
+    padding: 6px 10px;
+    border-radius: 3px;
+    cursor: pointer;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .ctx-btn:active { background: var(--amber); color: #000; }
+  .ctx-btn.secondary {
+    color: var(--text);
+    border-color: var(--border);
+    background: #0d1c14;
+    font-weight: normal;
+  }
+
+  /* D-Pad + Input Row */
+  .deck-lower {
+    display: flex;
+    align-items: stretch;
+  }
+  #dpad {
+    display: grid;
+    grid-template-columns: repeat(3, 36px);
+    grid-template-rows: repeat(3, 30px);
+    gap: 3px;
+    padding: 6px;
+    background: #080d0a;
+    border-right: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  #dpad button {
+    background: #112218;
+    color: var(--cyan);
+    border: 1px solid var(--border);
+    font-family: inherit;
+    font-size: 11px;
+    font-weight: bold;
+    border-radius: 2px;
+    cursor: pointer;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  #dpad button:active { background: var(--cyan); color: #000; }
+  #dpad button.center-btn {
+    color: var(--amber);
+    border-color: #443300;
+    font-size: 9px;
+  }
+
+  .input-col {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
+  #input-bar {
+    display: flex;
+    padding: 8px 10px;
+    align-items: center;
+    flex: 1;
+  }
+  #prompt-char {
+    color: var(--amber);
+    font-weight: bold;
+    margin-right: 8px;
+  }
+  #cmd-input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    color: var(--text);
+    font-family: inherit;
+    font-size: 16px; /* 16px prevents iOS auto-zoom on focus */
+    outline: none;
+    min-width: 0;
+  }
+  #send-btn {
+    background: var(--border);
+    color: var(--text);
+    border: none;
+    font-family: inherit;
+    font-size: 12px;
+    padding: 6px 12px;
+    border-radius: 2px;
+    cursor: pointer;
+  }
+
+  .msg-room { color: var(--cyan); font-weight: bold; }
+  .msg-amber { color: var(--amber); }
+  .msg-danger { color: var(--danger); }
+  .msg-dim { color: var(--dim); }
+
+  /* Mobile Responsive Rules */
+  @media (max-width: 768px) {
+    .brand-sub { display: none; }
+    #drawer-toggle { display: block; }
+    main { grid-template-columns: 1fr; }
+    .sidebar {
+      position: absolute;
+      top: 0;
+      right: 0;
+      bottom: 0;
+      width: 280px;
+      z-index: 20;
+      transform: translateX(100%);
+      transition: transform 0.2s ease;
+      box-shadow: -4px 0 16px rgba(0,0,0,0.8);
+    }
+    .sidebar.open {
+      transform: translateX(0);
+    }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <strong>FED II</strong>
+    <span class="hud-label brand-sub">// DataSpace</span>
+  </div>
+  <div class="hud-stats">
+    <span><span class="hud-label">Rank:</span> <span id="hud-rank" class="hud-val">GroundHog</span></span>
+    <span><span class="hud-label">Cash:</span> <span id="hud-cash" class="hud-val">2,000</span></span>
+    <span><span class="hud-label">Loan:</span> <span id="hud-loan" class="hud-val">0</span></span>
+    <span><span class="hud-label">Fuel:</span> <span id="hud-fuel" class="hud-val">--</span></span>
+  </div>
+  <button id="drawer-toggle" onclick="toggleDrawer()">RADAR / SHIP</button>
+</header>
+
+<main>
+  <div id="terminal" onclick="closeDrawerOnMobile()"></div>
+  <aside class="sidebar" id="sidebar">
+    <div class="box">
+      <div class="box-title">Sol System Radar</div>
+      <pre id="radar-map" style="margin:0; line-height:1.25; color:var(--text); font-size:13px;"></pre>
+    </div>
+    <div class="box">
+      <div class="box-title">Active Manifest</div>
+      <div id="manifest-info">No ship owned.</div>
+    </div>
+    <div class="box">
+      <div class="box-title">System Options</div>
+      <button class="ctx-btn secondary" style="width:100%; margin-bottom:6px;" onclick="runCmd('SCORE'); closeDrawerOnMobile();">VIEW FULL SCORE</button>
+      <button class="ctx-btn secondary" style="width:100%; margin-bottom:6px;" onclick="runCmd('HELP'); closeDrawerOnMobile();">COMMAND HELP</button>
+      <button class="ctx-btn secondary" style="width:100%; color:var(--danger); border-color:var(--danger);" onclick="resetGame()">RESET SAVE DATA</button>
+    </div>
+  </aside>
+</main>
+
+<section id="control-deck">
+  <!-- Dynamic Context Buttons based on current room & state -->
+  <div id="context-bar"></div>
+
+  <div class="deck-lower">
+    <!-- 8-Way Thumb D-Pad -->
+    <div id="dpad">
+      <button type="button" onclick="runCmd('NW')">NW</button>
+      <button type="button" onclick="runCmd('N')">N</button>
+      <button type="button" onclick="runCmd('NE')">NE</button>
+      <button type="button" onclick="runCmd('W')">W</button>
+      <button type="button" class="center-btn" id="dpad-center" onclick="handleCenterPad()">LOOK</button>
+      <button type="button" onclick="runCmd('E')">E</button>
+      <button type="button" onclick="runCmd('SW')">SW</button>
+      <button type="button" onclick="runCmd('S')">S</button>
+      <button type="button" onclick="runCmd('SE')">SE</button>
+    </div>
+
+    <div class="input-col">
+      <form id="input-bar" onsubmit="handleInput(event)">
+        <span id="prompt-char">&gt;</span>
+        <input id="cmd-input" type="text" autocomplete="off" placeholder="Type command or tap buttons..." />
+        <button type="submit" id="send-btn">SEND</button>
+      </form>
+    </div>
+  </div>
+</section>
+
+<script>
+const STORAGE_KEY = "fed2_save_v2";
+
+const defaultState = {
+  rank: "GroundHog",
+  cash: 2000,
+  loan: 0,
+  permit: false,
+  insured: false,
+  hasShip: false,
+  aboard: false,
+  inSpace: false,
+  loc: "meeting_point",
+  shipLoc: "earth_pad",
+  spaceX: 2,
+  spaceY: 2,
+  fuel: 0,
+  maxFuel: 100,
+  cargoTons: 0,
+  maxCargo: 75,
+  cargoItem: null,
+  job: null,
+  jobsCompleted: 0,
+  workboard: []
+};
+
+let state = loadState();
+
+const planets = {
+  earth:    { name: "Earth",         pad: "earth_pad",    x: 2, y: 2, symbol: "E", exports: ["Droids", "Alloys"], imports: ["Monopoles", "Spice"] },
+  moon:     { name: "Selene (Moon)", pad: "moon_pad",     x: 3, y: 2, symbol: "M", exports: ["Crystals", "Helium-3"], imports: ["Livestock", "Rations"] },
+  mars:     { name: "Mars",          pad: "mars_pad",     x: 4, y: 1, symbol: "R", exports: ["Livestock", "Rations"], imports: ["Droids", "Machinery"] },
+  venus:    { name: "Venus",         pad: "venus_pad",    x: 1, y: 3, symbol: "V", exports: ["Petrochemicals", "Xylen"], imports: ["Crystals", "Alloys"] },
+  callisto: { name: "Callisto",      pad: "callisto_pad", x: 0, y: 1, symbol: "C", exports: ["Monopoles", "Machinery"], imports: ["Petrochemicals", "Rations"] },
+  titan:    { name: "Titan",         pad: "titan_pad",    x: 4, y: 4, symbol: "T", exports: ["Spice", "Furs"], imports: ["Xylen", "Helium-3"] }
+};
+
+const commodities = {
+  "Droids": 420, "Alloys": 210, "Monopoles": 650, "Spice": 800,
+  "Crystals": 510, "Helium-3": 340, "Livestock": 190, "Rations": 130,
+  "Petrochemicals": 290, "Xylen": 580, "Machinery": 390, "Furs": 470
+};
+
+const rooms = {
+  meeting_point: {
+    title: "Meeting Point, Earth Starport",
+    desc: "You are standing at the central Meeting Point of Earth's Starport. Newly arrived GroundHogs check their guides while veteran Plutocrats stride past.\nA holographic sign flashes: 'NEW GROUNDHOGS: Go NORTH for your Ship Permit, then EAST to the Ship Yards!'",
+    exits: { N: "permit_office", S: "chez_diesel", E: "ship_yards", W: "ac_office" }
+  },
+  permit_office: {
+    title: "Galactic Administration - Permit Bureau",
+    desc: "Rows of bulletproof plastiglass booths line this sterile hall. The Clerk of the Purple Wax stamps forms with mechanical precision.",
+    exits: { S: "meeting_point", E: "hospital" }
+  },
+  hospital: {
+    title: "The Clone Arranger (Medical & Insurance)",
+    desc: "Stainless steel vats hum softly along the walls, storing backup genetic templates for spacers.",
+    exits: { W: "permit_office" }
+  },
+  ship_yards: {
+    title: "Earth Orbital Ship Yards - Sales Floor",
+    desc: "Through the panoramic viewport, gleaming hulls sit docked in massive cradles. A salesperson waves a finance contract for the Harrier-class starter freighter.",
+    exits: { W: "meeting_point" }
+  },
+  chez_diesel: {
+    title: "Chez Diesel",
+    desc: "The legendary spaceport dive bar. Diesel, the cybernetic bartender, polishes a glass with an oily rag. A battered Noticeboard hangs on the bulkhead.",
+    exits: { N: "meeting_point" }
+  },
+  ac_office: {
+    title: "Armstrong Cuthbert, Inc. - Central Dispatch",
+    desc: "Giant ticker screens flash interplanetary hauling contracts across the Sol System. Spacers crowd around the terminal bidding on 75-ton bulk runs.",
+    exits: { E: "meeting_point", W: "earth_pad" }
+  },
+  earth_pad: {
+    title: "Earth Starport - Landing Pad Alpha",
+    desc: "Scorched ferro-concrete stretches out beneath towering fuel gantries. Cargo loaders rumble between planetary freighters.",
+    exits: { E: "ac_office" },
+    planet: "earth"
+  },
+  moon_pad: {
+    title: "Selene Dome - Lunar Landing Pad",
+    desc: "Pressurized cargo tubes connect your pad to the subterranean lunar exchange under a stark black sky.",
+    exits: {},
+    planet: "moon"
+  },
+  mars_pad: {
+    title: "Olympus Spaceport - Mars Landing Pad",
+    desc: "Red dust swirls across the landing lights as automated agricultural hoppers queue by the warehouse bays.",
+    exits: {},
+    planet: "mars"
+  },
+  venus_pad: {
+    title: "Cytherean Cloud-Station - Venus Landing Pad",
+    desc: "Suspended high in the sulfuric upper atmosphere, this aerostat platform hums with chemical refineries.",
+    exits: {},
+    planet: "venus"
+  },
+  callisto_pad: {
+    title: "Valhalla Basin - Callisto Landing Pad",
+    desc: "Jovian radiation shields crackle overhead while heavy monopole containment pods wait on the magnetic tarmac.",
+    exits: {},
+    planet: "callisto"
+  },
+  titan_pad: {
+    title: "Huygens Port - Titan Landing Pad",
+    desc: "Methane rain patters against your viewport beneath the colossal amber rings of Saturn.",
+    exits: {},
+    planet: "titan"
+  }
+};
+
+const term = document.getElementById("terminal");
+const input = document.getElementById("cmd-input");
+const sidebar = document.getElementById("sidebar");
+
+function saveState() {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) {}
+}
+
+function loadState() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) return Object.assign({}, defaultState, JSON.parse(raw));
+  } catch (e) {}
+  return Object.assign({}, defaultState);
+}
+
+function resetGame() {
+  if (confirm("Reset your pilot back to a fresh GroundHog on Earth?")) {
+    localStorage.removeItem(STORAGE_KEY);
+    state = Object.assign({}, defaultState);
+    term.innerHTML = "";
+    generateJobs();
+    print("Save data wiped. Re-initializing new citizen record...", "msg-amber");
+    look();
+    updateHUD();
+    closeDrawerOnMobile();
+  }
+}
+
+function toggleDrawer() {
+  sidebar.classList.toggle("open");
+}
+function closeDrawerOnMobile() {
+  if (window.innerWidth <= 768) sidebar.classList.remove("open");
+}
+
+function print(text, cls = "") {
+  const div = document.createElement("div");
+  if (cls) div.className = cls;
+  div.textContent = text;
+  term.appendChild(div);
+  term.scrollTop = term.scrollHeight;
+}
+
+function generateJobs() {
+  state.workboard = [];
+  const pKeys = Object.keys(planets);
+  const cKeys = Object.keys(commodities);
+  for (let i = 1; i <= 4; i++) {
+    let fromKey = pKeys[Math.floor(Math.random() * pKeys.length)];
+    let toKey = pKeys[Math.floor(Math.random() * pKeys.length)];
+    while (toKey === fromKey) toKey = pKeys[Math.floor(Math.random() * pKeys.length)];
+    const fromP = planets[fromKey];
+    const toP = planets[toKey];
+    const dist = Math.max(1, Math.abs(fromP.x - toP.x) + Math.abs(fromP.y - toP.y));
+    const item = cKeys[Math.floor(Math.random() * cKeys.length)];
+    const pay = (dist * 550) + Math.floor(Math.random() * 350) + 600;
+    state.workboard.push({
+      id: i, fromKey, toKey,
+      fromName: fromP.name, toName: toP.name,
+      item, tons: 75, pay
+    });
+  }
+}
+
+function handleCenterPad() {
+  if (state.inSpace) {
+    // Check if over planet
+    for (const k in planets) {
+      if (planets[k].x === state.spaceX && planets[k].y === state.spaceY) {
+        runCmd("LAND");
+        return;
+      }
+    }
+    runCmd("LOOK");
+  } else if (state.aboard) {
+    runCmd("LAUNCH");
+  } else if (rooms[state.loc]?.planet && state.hasShip && state.shipLoc === state.loc) {
+    runCmd("BOARD");
+  } else {
+    runCmd("LOOK");
+  }
+}
+
+function renderContextButtons() {
+  const bar = document.getElementById("context-bar");
+  const centerBtn = document.getElementById("dpad-center");
+  bar.innerHTML = "";
+  const buttons = [];
+
+  const addBtn = (label, cmd, primary = true) => {
+    buttons.push({ label, cmd, primary });
+  };
+
+  // Update D-Pad Center button label dynamically
+  if (state.inSpace) {
+    let overPlanet = false;
+    for (const k in planets) {
+      if (planets[k].x === state.spaceX && planets[k].y === state.spaceY) overPlanet = true;
+    }
+    centerBtn.textContent = overPlanet ? "LAND" : "SCAN";
+  } else if (state.aboard) {
+    centerBtn.textContent = "LAUNCH";
+  } else if (rooms[state.loc]?.planet && state.hasShip && state.shipLoc === state.loc) {
+    centerBtn.textContent = "BOARD";
+  } else {
+    centerBtn.textContent = "LOOK";
+  }
+
+  // Contextual Room Actions
+  if (state.inSpace) {
+    for (const k in planets) {
+      if (planets[k].x === state.spaceX && planets[k].y === state.spaceY) {
+        addBtn(`LAND AT ${planets[k].name.toUpperCase()}`, "LAND");
+      }
+    }
+    addBtn("WORKBOARD", "WORK", false);
+  } else if (state.aboard) {
+    addBtn("LAUNCH TO ORBIT", "LAUNCH");
+    addBtn("EXIT TO PAD", "OUT", false);
+  } else {
+    const loc = state.loc;
+    const padPlanet = rooms[loc]?.planet;
+
+    if (loc === "permit_office" && !state.permit) addBtn("BUY PERMIT (500 ig)", "BUY PERMIT");
+    if (loc === "hospital" && !state.insured) addBtn("INSURE CLONE (250 ig)", "INSURE");
+    if (loc === "ship_yards") {
+      if (!state.hasShip) addBtn("BUY HARRIER SHIP", "BUY SHIP");
+      if (state.loan > 0 && state.cash >= 1000) addBtn("REPAY 1,000 ig", "REPAY 1000");
+      if (state.loan > 0 && state.cash >= state.loan) addBtn("PAY OFF LOAN", `REPAY ${state.loan}`);
+    }
+    if (loc === "chez_diesel") {
+      addBtn("READ BOARD", "READ BOARD");
+      addBtn("BUY ROUND (20 ig)", "BUY ROUND", false);
+    }
+    if (loc === "ac_office" || padPlanet) {
+      if (state.hasShip && !state.job) {
+        addBtn("GET JOBS (WORK)", "WORK");
+        state.workboard.forEach(j => {
+          addBtn(`#${j.id}: ${j.fromName.split(' ')[0]}->${j.toName.split(' ')[0]} (${j.pay}ig)`, `ACCEPT ${j.id}`, false);
+        });
+      }
+    }
+    if (padPlanet && state.hasShip && state.shipLoc === loc) {
+      if (state.job && state.cargoTons === 0 && state.job.fromKey === padPlanet) {
+        addBtn(`COLLECT ${state.job.item.toUpperCase()}`, "COLLECT");
+      }
+      if (state.job && state.cargoTons > 0 && state.job.toKey === padPlanet) {
+        addBtn(`DELIVER ${state.job.item.toUpperCase()} (+${state.job.pay} ig)`, "DELIVER");
+      }
+      if (state.fuel < state.maxFuel) {
+        addBtn(`FILL FUEL (${(state.maxFuel - state.fuel) * 5} ig)`, `BUY FUEL ${state.maxFuel - state.fuel}`, false);
+      }
+      addBtn("BOARD SHIP", "BOARD");
+      addBtn("PRICES", "PRICES", false);
+    }
+  }
+
+  addBtn("LOOK", "LOOK", false);
+  addBtn("SCORE", "SCORE", false);
+
+  buttons.forEach(b => {
+    const el = document.createElement("button");
+    el.type = "button";
+    el.className = "ctx-btn" + (b.primary ? "" : " secondary");
+    el.textContent = b.label;
+    el.onclick = () => runCmd(b.cmd);
+    bar.appendChild(el);
+  });
+}
+
+function updateHUD() {
+  document.getElementById("hud-rank").textContent = state.rank;
+  document.getElementById("hud-cash").textContent = state.cash.toLocaleString() + " ig";
+  document.getElementById("hud-loan").textContent = state.loan.toLocaleString() + " ig";
+  document.getElementById("hud-fuel").textContent = state.hasShip ? `${state.fuel}/${state.maxFuel}` : "--";
+
+  let mapStr = "   0  1  2  3  4\n";
+  for (let y = 0; y < 5; y++) {
+    mapStr += y + " ";
+    for (let x = 0; x < 5; x++) {
+      let cell = " . ";
+      for (const k in planets) {
+        if (planets[k].x === x && planets[k].y === y) cell = "[" + planets[k].symbol + "]";
+      }
+      if (state.inSpace && state.spaceX === x && state.spaceY === y) cell = "<*>";
+      mapStr += cell;
+    }
+    mapStr += "\n";
+  }
+  mapStr += "\nE:Earth M:Moon R:Mars\nV:Venus C:Callisto T:Titan";
+  document.getElementById("radar-map").textContent = mapStr;
+
+  const mf = document.getElementById("manifest-info");
+  if (!state.hasShip) {
+    mf.innerHTML = "Ship: None<br>Permit: " + (state.permit ? "Granted" : "None");
+  } else {
+    let jobTxt = state.job
+      ? `<span style="color:var(--amber)">AC Job: 75t ${state.job.item}<br>Pickup: ${state.job.fromName}<br>Dropoff: ${state.job.toName} (${state.job.pay} ig)</span>`
+      : "No active AC contract";
+    let holdTxt = state.cargoTons > 0 ? `${state.cargoTons}t ${state.cargoItem}` : "Empty (0/75t)";
+    mf.innerHTML = `Hull: Harrier-Class<br>Loc: ${state.inSpace ? `Sector (${state.spaceX},${state.spaceY})` : rooms[state.shipLoc].title}<br>Hold: ${holdTxt}<br><br>${jobTxt}`;
+  }
+
+  renderContextButtons();
+  saveState();
+}
+
+function checkPromotions() {
+  if (state.rank === "Commander" && state.loan <= 0 && state.jobsCompleted >= 1) {
+    state.rank = "Captain";
+    print("\n*** PROMOTION! You have paid off your Galactic Bank ship loan! ***", "msg-amber");
+    print("*** You are now a CAPTAIN and unlocked direct Commodity Exchange trading (PRICES, BUY, SELL)! ***\n", "msg-amber");
+  }
+  if (state.rank === "Captain" && state.cash >= 25000 && state.jobsCompleted >= 5) {
+    state.rank = "Merchant";
+    print("\n*** PROMOTION! The Galactic Administration promotes you to MERCHANT! ***\n", "msg-amber");
+  }
+}
+
+function look() {
+  if (state.inSpace) {
+    print(`\nSol System Space [Sector ${state.spaceX}, ${state.spaceY}]`, "msg-room");
+    let foundPlanet = null;
+    for (const k in planets) {
+      if (planets[k].x === state.spaceX && planets[k].y === state.spaceY) foundPlanet = planets[k];
+    }
+    if (foundPlanet) {
+      print(`Orbiting above: ${foundPlanet.name}. Tap LAND (or center D-pad) to touch down.`, "msg-amber");
+    } else {
+      print("Deep space. Use the D-pad to navigate toward your destination coordinates.");
+    }
+    return;
+  }
+
+  if (state.aboard) {
+    const padRoom = rooms[state.shipLoc];
+    print(`\nBridge of Harrier Freighter (Docked at ${padRoom.title})`, "msg-room");
+    print("You are strapped into the pilot's crash-couch. Tap LAUNCH to enter orbit, or EXIT TO PAD.");
+    return;
+  }
+
+  const r = rooms[state.loc];
+  print(`\n${r.title}`, "msg-room");
+  print(r.desc);
+  if (state.hasShip && state.shipLoc === state.loc) {
+    print("Your Harrier-class light freighter sits docked on the tarmac nearby.", "msg-amber");
+  }
+  const ex = Object.keys(r.exits);
+  print("Obvious exits: " + (ex.length ? ex.join(", ") : "None (Board ship to depart)"), "msg-dim");
+}
+
+function moveGround(dir) {
+  const r = rooms[state.loc];
+  if (!r.exits[dir]) {
+    print("You can't go that way.", "msg-danger");
+    return;
+  }
+  state.loc = r.exits[dir];
+  look();
+}
+
+function moveSpace(dx, dy) {
+  if (state.fuel < 2) {
+    print("WARNING: Out of fuel! SpyNet Emergency Tow deducts 500 ig and hauls you back to Earth.", "msg-danger");
+    state.cash = Math.max(0, state.cash - 500);
+    state.fuel = 25;
+    state.inSpace = false;
+    state.aboard = false;
+    state.shipLoc = "earth_pad";
+    state.loc = "earth_pad";
+    look();
+    return;
+  }
+  const nx = state.spaceX + dx;
+  const ny = state.spaceY + dy;
+  if (nx < 0 || nx > 4 || ny < 0 || ny > 4) {
+    print("Nav-Computer: Stay within Sol System grid (0,0 to 4,4).", "msg-danger");
+    return;
+  }
+  state.spaceX = nx;
+  state.spaceY = ny;
+  state.fuel -= 2;
+  look();
+}
+
+function getPlanetPrice(planetKey, item) {
+  const base = commodities[item];
+  const p = planets[planetKey];
+  if (p.exports.includes(item)) return Math.round(base * 0.72);
+  if (p.imports.includes(item)) return Math.round(base * 1.38);
+  return base;
+}
+
+function runCmd(raw) {
+  const clean = raw.trim();
+  if (!clean) return;
+  print(`\n> ${clean}`, "msg-amber");
+
+  const parts = clean.toUpperCase().split(/\s+/);
+  const verb = parts[0];
+  const arg1 = parts[1];
+  const arg2 = parts[2];
+
+  const spaceDirs = {
+    N: [0,-1], NORTH: [0,-1], S: [0,1], SOUTH: [0,1],
+    E: [1,0], EAST: [1,0], W: [-1,0], WEST: [-1,0],
+    NE: [1,-1], NW: [-1,-1], SE: [1,1], SW: [-1,1]
+  };
+
+  if (spaceDirs[verb]) {
+    if (state.inSpace) {
+      moveSpace(spaceDirs[verb][0], spaceDirs[verb][1]);
+    } else if (state.aboard) {
+      print("You are inside the cockpit! Tap LAUNCH to enter orbit, or OUT to step onto the pad.", "msg-danger");
+    } else {
+      const shortDir = verb === "NORTH" ? "N" : verb === "SOUTH" ? "S" : verb === "EAST" ? "E" : verb === "WEST" ? "W" : verb;
+      moveGround(shortDir);
+    }
+    updateHUD();
+    return;
+  }
+
+  switch (verb) {
+    case "L":
+    case "LOOK":
+      look();
+      break;
+
+    case "HELP":
+      print("FEDERATION II COMMAND REFERENCE:", "msg-room");
+      print("  Use the bottom D-Pad to move/fly and tap the amber Action Chips above it!");
+      print("  Text Commands: WORK, ACCEPT <#>, COLLECT, DELIVER, BUY FUEL, REPAY <amt>, PRICES, BUY <item>, SELL, SCORE");
+      break;
+
+    case "SCORE":
+    case "STATUS":
+      print(`=== CITIZEN RECORD: ${state.rank.toUpperCase()} ===`, "msg-room");
+      print(`  Bank Balance : ${state.cash.toLocaleString()} ig`);
+      print(`  Ship Loan    : ${state.loan.toLocaleString()} ig`);
+      print(`  Ship Permit  : ${state.permit ? "Granted" : "None"}`);
+      print(`  Clone Insure : ${state.insured ? "Active" : "UNINSURED"}`);
+      print(`  Hauls Done   : ${state.jobsCompleted}`);
+      break;
+
+    case "INSURE":
+      if (state.loc !== "hospital") {
+        print("Go to The Clone Arranger (East of the Permit Office) to buy insurance.", "msg-danger");
+      } else if (state.insured) {
+        print("Your genetic template is already insured.", "msg-dim");
+      } else if (state.cash < 250) {
+        print("You need 250 ig for clone insurance.", "msg-danger");
+      } else {
+        state.cash -= 250;
+        state.insured = true;
+        print("DNA sample archived! Your clone insurance policy is now active.");
+      }
+      break;
+
+    case "READ":
+      if (state.loc === "chez_diesel") {
+        print("=== CHEZ DIESEL NOTICEBOARD ===", "msg-room");
+        print("1. 'Earth is at (2,2), Moon at (3,2), Mars at (4,1), Venus at (1,3), Callisto at (0,1), Titan at (4,4).'");
+        print("2. 'Tap RADAR/SHIP at the top right on mobile to check your coordinates and active cargo!'");
+      } else {
+        print("Nothing to read here.");
+      }
+      break;
+
+    case "BUY":
+      if (arg1 === "PERMIT") {
+        if (state.loc !== "permit_office") {
+          print("Go North from the Meeting Point to the Permit Bureau.", "msg-danger");
+        } else if (state.permit) {
+          print("You already hold a Ship Permit.");
+        } else if (state.cash < 500) {
+          print("You need 500 ig.", "msg-danger");
+        } else {
+          state.cash -= 500;
+          state.permit = true;
+          print("The Clerk of the Purple Wax stamps your permit! Head South then East to the Ship Yards.");
+        }
+      } else if (arg1 === "SHIP") {
+        if (state.loc !== "ship_yards") {
+          print("Go to the Earth Ship Yards (East of Meeting Point) to buy a ship.", "msg-danger");
+        } else if (!state.permit) {
+          print("You need a Ship Permit from the Permit Bureau first!", "msg-danger");
+        } else if (state.hasShip) {
+          print("You already own a Harrier freighter!");
+        } else {
+          state.cash -= 1000;
+          state.loan = 15000;
+          state.hasShip = true;
+          state.fuel = 100;
+          state.rank = "Commander";
+          state.shipLoc = "earth_pad";
+          print("You sign the Galactic Bank loan (1,000 ig down, 15,000 ig loan).");
+          print("Your Harrier-class freighter is waiting at Earth Landing Pad Alpha (go West twice from here)!");
+          print("\n*** PROMOTION! You are now a COMMANDER! ***", "msg-amber");
+        }
+      } else if (arg1 === "FUEL") {
+        const padPlanet = rooms[state.loc]?.planet;
+        if (!state.hasShip || (!padPlanet && !state.aboard)) {
+          print("You must be at a Landing Pad with your ship to refuel.", "msg-danger");
+        } else {
+          const amt = Math.min(parseInt(arg2) || (state.maxFuel - state.fuel), state.maxFuel - state.fuel);
+          const cost = amt * 5;
+          if (amt <= 0) {
+            print("Fuel tanks are already at 100/100.");
+          } else if (state.cash < cost) {
+            print(`You need ${cost} ig for ${amt} fuel.`, "msg-danger");
+          } else {
+            state.cash -= cost;
+            state.fuel += amt;
+            print(`Refueled +${amt} units for ${cost} ig. Fuel: ${state.fuel}/${state.maxFuel}.`);
+          }
+        }
+      } else if (arg1 === "ROUND") {
+        if (state.loc !== "chez_diesel") {
+          print("Go to Chez Diesel to buy a round!", "msg-danger");
+        } else if (state.cash < 20) {
+          print("Not enough groats.", "msg-danger");
+        } else {
+          state.cash -= 20;
+          print("You buy a round of Gargle Blasters for the bar! The spacers cheer.");
+        }
+      } else if (arg1) {
+        const padPlanet = rooms[state.loc]?.planet;
+        if (state.rank === "GroundHog" || state.rank === "Commander") {
+          print("Pay off your 15,000 ig ship loan to reach Captain before trading on the Exchange!", "msg-danger");
+        } else if (!padPlanet || state.shipLoc !== state.loc) {
+          print("Stand on a Landing Pad with your ship to buy cargo.", "msg-danger");
+        } else if (state.cargoTons > 0) {
+          print("Your 75t hold is already full!", "msg-danger");
+        } else {
+          const itemKey = Object.keys(commodities).find(k => k.toUpperCase() === arg1);
+          if (!itemKey) {
+            print("Unknown item. Tap PRICES to see local goods.", "msg-danger");
+          } else {
+            const totalCost = getPlanetPrice(padPlanet, itemKey) * 10;
+            if (state.cash < totalCost) {
+              print(`Need ${totalCost.toLocaleString()} ig for 75t of ${itemKey}.`, "msg-danger");
+            } else {
+              state.cash -= totalCost;
+              state.cargoTons = 75;
+              state.cargoItem = itemKey;
+              print(`Loaded 75t of ${itemKey} for ${totalCost.toLocaleString()} ig.`);
+            }
+          }
+        }
+      }
+      break;
+
+    case "SELL": {
+      const padPlanet = rooms[state.loc]?.planet;
+      if (!padPlanet || state.shipLoc !== state.loc) {
+        print("You must be on a Landing Pad with your ship.", "msg-danger");
+      } else if (state.job && state.cargoTons > 0) {
+        print("That's contract cargo! Tap DELIVER at the destination pad.", "msg-danger");
+      } else if (state.cargoTons === 0) {
+        print("Your hold is empty.", "msg-danger");
+      } else {
+        const revenue = getPlanetPrice(padPlanet, state.cargoItem) * 10;
+        state.cash += revenue;
+        state.jobsCompleted++;
+        print(`Sold 75t of ${state.cargoItem} for ${revenue.toLocaleString()} ig!`, "msg-amber");
+        state.cargoTons = 0;
+        state.cargoItem = null;
+        checkPromotions();
+      }
+      break;
+    }
+
+    case "PRICES": {
+      const padPlanet = rooms[state.loc]?.planet;
+      if (!padPlanet) {
+        print("Go to a Landing Pad to check local Exchange prices.", "msg-danger");
+      } else {
+        const p = planets[padPlanet];
+        print(`=== ${p.name.toUpperCase()} EXCHANGE (75t Bay) ===`, "msg-room");
+        Object.keys(commodities).forEach(k => {
+          const cost = getPlanetPrice(padPlanet, k) * 10;
+          let tag = p.exports.includes(k) ? " [CHEAP]" : p.imports.includes(k) ? " [HIGH DEMAND]" : "";
+          print(`  ${k.padEnd(15)}: ${cost.toLocaleString().padStart(6)} ig${tag}`);
+        });
+      }
+      break;
+    }
+
+    case "REPAY": {
+      if (state.loan <= 0) {
+        print("Your loan is already paid off!");
+      } else {
+        const amt = Math.min(parseInt(arg1) || state.loan, state.loan, state.cash);
+        if (amt <= 0) {
+          print("Not enough cash.", "msg-danger");
+        } else {
+          state.cash -= amt;
+          state.loan -= amt;
+          print(`Paid ${amt.toLocaleString()} ig toward loan. Remaining: ${state.loan.toLocaleString()} ig.`);
+          checkPromotions();
+        }
+      }
+      break;
+    }
+
+    case "BOARD":
+      if (state.inSpace) {
+        print("Already in space!", "msg-danger");
+      } else if (state.aboard) {
+        state.aboard = false;
+        state.loc = state.shipLoc;
+        print("You step out of the airlock onto the Landing Pad.");
+        look();
+      } else if (!state.hasShip || state.shipLoc !== state.loc) {
+        print("Your ship isn't here! (Earth Pad Alpha is West of Armstrong Cuthbert).", "msg-danger");
+      } else {
+        state.aboard = true;
+        print("You climb aboard your Harrier freighter.");
+        look();
+      }
+      break;
+
+    case "OUT":
+    case "EXIT":
+      if (state.inSpace) {
+        print("LAND on a planet first!", "msg-danger");
+      } else if (state.aboard) {
+        state.aboard = false;
+        state.loc = state.shipLoc;
+        print("You step out onto the Landing Pad.");
+        look();
+      }
+      break;
+
+    case "LAUNCH":
+    case "U":
+    case "UP":
+      if (state.inSpace) {
+        print("Already in orbit!");
+      } else if (!state.aboard) {
+        print("BOARD your ship first!", "msg-danger");
+      } else if (state.fuel < 5) {
+        print("Need at least 5 fuel to launch! Exit ship and BUY FUEL.", "msg-danger");
+      } else {
+        const pKey = rooms[state.shipLoc].planet;
+        state.spaceX = planets[pKey].x;
+        state.spaceY = planets[pKey].y;
+        state.fuel -= 5;
+        state.inSpace = true;
+        print("Thrusters ignite! You climb into Sol System orbit.", "msg-amber");
+        look();
+      }
+      break;
+
+    case "LAND":
+    case "D":
+    case "DOWN":
+      if (!state.inSpace) {
+        print("Already on the ground!");
+      } else {
+        let targetKey = null;
+        for (const k in planets) {
+          if (planets[k].x === state.spaceX && planets[k].y === state.spaceY) targetKey = k;
+        }
+        if (!targetKey) {
+          print("No planet at this sector! Fly to [E](2,2), [M](3,2), [R](4,1), [V](1,3), [C](0,1), or [T](4,4).", "msg-danger");
+        } else {
+          state.inSpace = false;
+          state.aboard = false;
+          state.shipLoc = planets[targetKey].pad;
+          state.loc = planets[targetKey].pad;
+          print(`Touched down at ${planets[targetKey].name} and stepped onto the pad!`, "msg-amber");
+          look();
+        }
+      }
+      break;
+
+    case "WORK":
+      if (!state.hasShip) {
+        print("Buy your Ship Permit and Ship first!", "msg-danger");
+      } else {
+        generateJobs();
+        print("=== ARMSTRONG CUTHBERT WORKBOARD ===", "msg-room");
+        state.workboard.forEach(j => {
+          print(`  [${j.id}] 75t ${j.item}: ${j.fromName} -> ${j.toName} (${j.pay} ig)`);
+        });
+        print("Tap a job button below or type ACCEPT <#>");
+      }
+      break;
+
+    case "ACCEPT": {
+      const id = parseInt(arg1);
+      if (!state.hasShip) {
+        print("Need a ship first!", "msg-danger");
+      } else if (state.job) {
+        print(`Active job already in progress (${state.job.fromName} -> ${state.job.toName})!`, "msg-danger");
+      } else {
+        const found = state.workboard.find(j => j.id === id);
+        if (!found) {
+          print("Tap WORK to refresh job numbers.", "msg-danger");
+        } else {
+          state.job = found;
+          print(`Accepted! Fly to ${found.fromName} to COLLECT 75t ${found.item}, then haul to ${found.toName} and DELIVER.`, "msg-amber");
+        }
+      }
+      break;
+    }
+
+    case "COLLECT": {
+      const padPlanet = rooms[state.loc]?.planet;
+      if (!state.job) {
+        print("No active contract.", "msg-danger");
+      } else if (state.cargoTons > 0) {
+        print("Hold is already loaded!", "msg-danger");
+      } else if (padPlanet !== state.job.fromKey || state.shipLoc !== state.loc) {
+        print(`Fly to ${state.job.fromName} to collect this cargo!`, "msg-danger");
+      } else {
+        state.cargoTons = 75;
+        state.cargoItem = state.job.item;
+        print(`Loaded 75t of ${state.job.item}! Destination: ${state.job.toName}.`, "msg-amber");
+      }
+      break;
+    }
+
+    case "DELIVER": {
+      const padPlanet = rooms[state.loc]?.planet;
+      if (!state.job || state.cargoTons === 0) {
+        print("No contract cargo aboard to deliver!", "msg-danger");
+      } else if (padPlanet !== state.job.toKey || state.shipLoc !== state.loc) {
+        print(`Deliver this load to ${state.job.toName}!`, "msg-danger");
+      } else {
+        const pay = state.job.pay;
+        state.cash += pay;
+        state.jobsCompleted++;
+        print(`Delivered 75t ${state.job.item}! Credited +${pay.toLocaleString()} ig.`, "msg-amber");
+        if (state.loan > 0) {
+          const autoDeduct = Math.min(state.loan, Math.round(pay * 0.25));
+          state.cash -= autoDeduct;
+          state.loan -= autoDeduct;
+          print(`Galactic Bank deducts ${autoDeduct} ig toward loan (${state.loan.toLocaleString()} ig left).`);
+        }
+        state.cargoTons = 0;
+        state.cargoItem = null;
+        state.job = null;
+        generateJobs();
+        checkPromotions();
+      }
+      break;
+    }
+
+    default:
+      print("Command not recognized. Tap an action button below or type HELP.", "msg-danger");
+  }
+
+  updateHUD();
+}
+
+function handleInput(e) {
+  e.preventDefault();
+  const val = input.value;
+  input.value = "";
+  input.blur(); // Dismisses mobile keyboard after manual entry
+  runCmd(val);
+}
+
+// Boot
+print("==========================================================", "msg-dim");
+print("  AOL GATEWAY :: FEDERATION II DATASPACE (MOBILE-READY)", "msg-amber");
+print("  Auto-Save Active. Tap action chips or D-Pad below!", "msg-dim");
+print("==========================================================", "msg-dim");
+if (!state.workboard || state.workboard.length === 0) generateJobs();
+look();
+updateHUD();
+</script>
+</body>
+</html>
